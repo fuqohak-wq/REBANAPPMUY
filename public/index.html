@@ -1,114 +1,94 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Rebana Generator</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+<script>
+  const GAS_URL = "[https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec](https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec)";
 
-  <div class="max-w-xl w-full bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl">
-    <!-- Header -->
-    <div class="text-center mb-6">
-      <h1 class="text-3xl font-bold text-emerald-400">🥁 AI Rebana Generator</h1>
-      <p class="text-slate-400 text-sm mt-1">Pembuat iringan perkusi Hadroh & Rebana murni berbasis AI (Bebas Alat Musik Haram)</p>
-    </div>
+  // Web Audio Context Synthesizer khusus suara Rebana/Perkusi
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    <!-- Form -->
-    <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium mb-1 text-slate-300">Pilih Gaya Ketukan Rebana:</label>
-        <select id="styleSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500">
-          <option value="banjari">Hadroh Banjari (Cepat & Energetik)</option>
-          <option value="habibi">Habibi / Duff Rhythm (Sedang)</option>
-          <option value="slow">Hadroh Pelan / Meditatif (Slow Beat)</option>
-        </select>
-      </div>
+  function playRebanaSound(type, timeOffset) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const now = audioCtx.currentTime + timeOffset;
 
-      <div>
-        <label class="block text-sm font-medium mb-1 text-slate-300">Lirik / Catatan Lagu (Opsional):</label>
-        <textarea id="lyricsInput" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="Masukkan lirik sholawat atau catatan untuk disimpan ke sheet..."></textarea>
-      </div>
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
 
-      <button id="generateBtn" onclick="generateRebana()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-emerald-900/40">
-        <span>Generate Irama Rebana</span>
-      </button>
-    </div>
-
-    <!-- Loading Indicator -->
-    <div id="loading" class="hidden my-6 text-center">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
-      <p class="text-xs text-slate-400 mt-2">Sedang memproses ketukan rebana via AI (membutuhkan 10-30 detik)...</p>
-    </div>
-
-    <!-- Result Player -->
-    <div id="resultArea" class="hidden mt-6 p-4 bg-slate-900 rounded-xl border border-emerald-500/30">
-      <h3 class="text-sm font-semibold text-emerald-400 mb-2 text-center">🎉 Hasil Irama Rebana AI:</h3>
-      <audio id="audioPlayer" controls class="w-full mb-3"></audio>
-      <a id="downloadBtn" download="rebana-ai.wav" class="block text-center bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm py-2 rounded-lg font-medium transition">
-        ⬇️ Download File Audio (.WAV)
-      </a>
-    </div>
-  </div>
-
-  <script>
-    // MASUKKAN URL GOOGLE APPS SCRIPT WEB APP KAMU DI SINI (Opsional)
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec";
-
-async function generateRebana() {
-  const style = document.getElementById('styleSelect').value;
-  const lyrics = document.getElementById('lyricsInput').value;
-  const btn = document.getElementById('generateBtn');
-  const loading = document.getElementById('loading');
-  const resultArea = document.getElementById('resultArea');
-  const audioPlayer = document.getElementById('audioPlayer');
-  const downloadBtn = document.getElementById('downloadBtn');
-
-  btn.disabled = true;
-  btn.classList.add('opacity-50');
-  loading.classList.remove('hidden');
-  resultArea.classList.add('hidden');
-
-  try {
-    // 1. Panggil Vercel Serverless Function
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ style, lyrics })
-    });
-
-    // IF ERROR: Baca pesan detail dari backend
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({ error: 'Gagal memproses respon server' }));
-      throw new Error(errData.error || `Server Error (${response.status})`);
+    if (type === 'dung') {
+      // Suara Bass Rebana (Dung)
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.3);
+      gain.gain.setValueAtTime(1, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } else if (type === 'tak' || type === 'keprak') {
+      // Suara High Percussion (Tak/Keprak)
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+      gain.gain.setValueAtTime(0.8, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+      osc.start(now);
+      osc.stop(now + 0.1);
     }
+  }
 
-    const blob = await response.blob();
-    const audioUrl = URL.createObjectURL(blob);
+  async function generateRebana() {
+    const style = document.getElementById('styleSelect').value;
+    const lyrics = document.getElementById('lyricsInput').value;
+    const btn = document.getElementById('generateBtn');
+    const loading = document.getElementById('loading');
+    const resultArea = document.getElementById('resultArea');
 
-    audioPlayer.src = audioUrl;
-    downloadBtn.href = audioUrl;
-    resultArea.classList.remove('hidden');
+    btn.disabled = true;
+    btn.classList.add('opacity-50');
+    loading.classList.remove('hidden');
+    resultArea.classList.add('hidden');
 
-    // 2. Simpan Log ke Google Apps Script (Background)
-    if (typeof GAS_URL !== 'undefined' && GAS_URL && !GAS_URL.includes("URL_GOOGLE_APPS_SCRIPT_KAMU")) {
-      fetch(GAS_URL, {
+    try {
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      // 1. Minta komposisi ketukan dari Gemini via Vercel
+      const response = await fetch('/api/generate', {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ style, lyrics })
-      }).catch(err => console.log("GAS Log Error:", err));
-    }
+      });
 
-  } catch (err) {
-    alert("Detail Error: " + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove('opacity-50');
-    loading.classList.add('hidden');
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Gagal memproses AI');
+      }
+
+      const patternData = await response.json();
+
+      // 2. Bunyikan urutan ketukan perkusi di browser
+      if (patternData.sequence && Array.isArray(patternData.sequence)) {
+        patternData.sequence.forEach(item => {
+          playRebanaSound(item.sound, item.time);
+        });
+      }
+
+      resultArea.classList.remove('hidden');
+
+      // 3. Log ke GAS
+      if (GAS_URL) {
+        fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ style, lyrics })
+        }).catch(e => console.log("GAS Log Error:", e));
+      }
+
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('opacity-50');
+      loading.classList.add('hidden');
+    }
   }
-}
-  </script>
-</body>
-</html>
+</script>
