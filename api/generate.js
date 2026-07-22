@@ -10,77 +10,69 @@ export default async function handler(req) {
   }
 
   try {
-    const { style = 'banjari' } = await req.json();
+    const { style = 'banjari', lyrics = '' } = await req.json();
 
-    const HF_TOKEN = process.env.HF_TOKEN;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-    if (!HF_TOKEN) {
+    if (!GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'HF_TOKEN belum dipasang di Vercel Environment Variables!' }), 
+        JSON.stringify({ error: 'GEMINI_API_KEY belum dipasang di Vercel Environment Variables!' }), 
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const stylePrompts = {
-      banjari: "fast energetic Hadroh Banjari style, rapid frame drum rolls, high energy tempo, syncopated Islamic percussion",
-      habibi: "medium tempo Middle Eastern Duff rhythm, accent beat, lively traditional hand drumming",
-      slow: "slow solemn Hadroh beat, deep bass frame drum, meditative acoustic Islamic rhythm"
-    };
+    // Prompt khusus ke Gemini untuk merancang pola ketukan Rebana
+    const promptText = `Kamu adalah pakar ketukan Rebana/Hadroh tradisional. 
+Tugasmu: Bikin pola ketukan perkusi rebana murni berbasis variabel tempo (BPM) dan urutan instrumen (Dung, Tak, Keprak, Bass) untuk gaya: "${style}".
+Lirik/Tema lagu: "${lyrics}".
 
-    const selectedStyle = stylePrompts[style] || stylePrompts.banjari;
+Kembalikan jawaban HANYA dalam format JSON valid berikut (tanpa Markdown ```json):
+{
+  "bpm": 110,
+  "pattern_name": "Hadroh Banjari",
+  "sequence": [
+    {"time": 0, "sound": "dung"},
+    {"time": 0.25, "sound": "tak"},
+    {"time": 0.5, "sound": "keprak"},
+    {"time": 0.75, "sound": "dung"},
+    {"time": 1.0, "sound": "tak"}
+  ]
+}`;
 
-    // 🔒 Prompt Ketat Murni Rebana
-    const promptText = `Solo acoustic frame drum performance, traditional rebana percussion, ${selectedStyle}, pure percussion ensemble, organic acoustic wood and skin sound, dynamic rhythm. [STRICT INSTRUCTION: Pure acoustic percussion only. NO piano, NO guitar, NO synth, NO bass, NO flute, NO strings, NO melody, NO vocals, NO singing, NO electronic beats]`;
-
-    // Daftar model AI musik/audio di Hugging Face sebagai cadangan (Fallback list)
-    const models = [
-      "https://api-inference.huggingface.co/models/facebook/musicgen-small",
-      "https://api-inference.huggingface.co/models/facebook/musicgen-medium",
-      "https://api-inference.huggingface.co/models/riffusion/riffusion-model-v1"
-    ];
-
-    let lastError = "";
-
-    // Coba setiap model satu per satu secara otomatis
-    for (const modelUrl of models) {
-      try {
-        const hfResponse = await fetch(modelUrl, {
-          headers: {
-            Authorization: `Bearer ${HF_TOKEN}`,
-            "Content-Type": "application/json",
-            "x-wait-for-model": "true"
-          },
-          method: "POST",
-          body: JSON.stringify({ inputs: promptText }),
-        });
-
-        if (hfResponse.ok) {
-          const audioData = await hfResponse.arrayBuffer();
-          return new Response(audioData, {
-            status: 200,
-            headers: {
-              'Content-Type': 'audio/wav',
-              'Cache-Control': 'no-store',
-            },
-          });
-        } else {
-          const errText = await hfResponse.text();
-          lastError = `Model (${modelUrl.split('/').pop()}) Status ${hfResponse.status}: ${errText}`;
-        }
-      } catch (e) {
-        lastError = e.message;
+    // Panggil Gemini API (v1beta / models)
+    const geminiResponse = await fetch(
+      `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){GEMINI_API_KEY}`,
+      {
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        }),
       }
+    );
+
+    if (!geminiResponse.ok) {
+      const errText = await geminiResponse.text();
+      return new Response(
+        JSON.stringify({ error: `Gemini API Error (${geminiResponse.status}): ${errText}` }), 
+        { status: geminiResponse.status, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Jika semua model gagal
-    return new Response(
-      JSON.stringify({ error: `Hugging Face Server Error. Detail: ${lastError}` }), 
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    const data = await geminiResponse.json();
+    const rawText = data.candidates[0].content.parts[0].text;
+    
+    // Bersihkan format jika Gemini menyisipkan tag markdown
+    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    return new Response(cleanJson, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message || 'Gagal terhubung ke server AI' }), 
+      JSON.stringify({ error: error.message || 'Gagal terhubung ke Gemini AI' }), 
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
