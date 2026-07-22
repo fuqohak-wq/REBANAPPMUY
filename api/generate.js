@@ -7,10 +7,9 @@ export default async function handler(req, res) {
 
   const { style = 'banjari', lyrics = '' } = req.body;
 
-  // TOKEN HUGGING FACE KAMU TERPASANG DI SINI
+  // Mengambil Token dari Vercel Environment Variable atau Fallback Direct Token
   const HF_TOKEN = process.env.HF_TOKEN || "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";
 
-  // Mapping Gaya Ketukan Rebana
   const stylePrompts = {
     banjari: "fast energetic Hadroh Banjari style, rapid frame drum rolls, high energy tempo, syncopated Islamic percussion",
     habibi: "medium tempo Middle Eastern Duff rhythm, accent beat, lively traditional hand drumming",
@@ -19,7 +18,7 @@ export default async function handler(req, res) {
 
   const selectedStyle = stylePrompts[style] || stylePrompts.banjari;
 
-  // 🔒 PROMPT KETAT (Murni Rebana / Perkusi Non-Melodi)
+  // 🔒 PROMPT KETAT
   const prompt = `Solo acoustic frame drum performance, traditional rebana percussion, ${selectedStyle}, pure percussion ensemble, organic acoustic wood and skin sound, dynamic rhythm. [STRICT INSTRUCTION: Pure acoustic percussion only. NO piano, NO guitar, NO synth, NO bass, NO flute, NO strings, NO melody, NO vocals, NO singing, NO electronic beats]`;
 
   try {
@@ -29,6 +28,7 @@ export default async function handler(req, res) {
         headers: {
           Authorization: `Bearer ${HF_TOKEN}`,
           "Content-Type": "application/json",
+          "x-wait-for-model": "true" // 💡 SOLUSI: Memaksa Hugging Face menunggu hingga model bangun/siap
         },
         method: "POST",
         body: JSON.stringify({ inputs: prompt }),
@@ -37,10 +37,13 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`HuggingFace API Error: ${errText}`);
+      let parsedError;
+      try { parsedError = JSON.parse(errText); } catch(e) {}
+      
+      const errorMessage = parsedError?.error || errText || response.statusText;
+      throw new Error(`[HuggingFace API] ${errorMessage}`);
     }
 
-    // Mengambil audio buffer dan mengembalikannya sebagai response WAV
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -49,6 +52,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Error generating audio:", error);
+    // Mengembalikan pesan error detail ke frontend
     return res.status(500).json({ error: error.message || "Gagal membuat audio rebana" });
   }
 }
