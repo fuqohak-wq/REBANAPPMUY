@@ -1,4 +1,5 @@
 // api/generate.js
+
 export const config = {
   runtime: 'edge',
 };
@@ -11,14 +12,13 @@ export default async function handler(req) {
   try {
     const { style = 'banjari' } = await req.json();
 
-    // 🔒 AMBIL DARI VERCEL ENV (TIDAK ADA STRING TOKEN DI SINI)
     const HF_TOKEN = process.env.HF_TOKEN;
 
     if (!HF_TOKEN) {
-      return new Response(JSON.stringify({ error: 'HF_TOKEN belum dipasang di Vercel Environment Variables!' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: 'HF_TOKEN tidak ditemukan di Vercel Environment Variables!' }), 
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     const stylePrompts = {
@@ -29,10 +29,12 @@ export default async function handler(req) {
 
     const selectedStyle = stylePrompts[style] || stylePrompts.banjari;
 
-    const prompt = `Solo acoustic frame drum performance, traditional rebana percussion, ${selectedStyle}, pure percussion ensemble, organic acoustic wood and skin sound, dynamic rhythm. [STRICT INSTRUCTION: Pure acoustic percussion only. NO piano, NO guitar, NO synth, NO bass, NO flute, NO strings, NO melody, NO vocals, NO singing, NO electronic beats]`;
+    // 🔒 Prompt Ketat Murni Perkusi Rebana
+    const promptText = `Solo acoustic frame drum performance, traditional rebana percussion, ${selectedStyle}, pure percussion ensemble, organic acoustic wood and skin sound, dynamic rhythm. [STRICT INSTRUCTION: Pure acoustic percussion only. NO piano, NO guitar, NO synth, NO bass, NO flute, NO strings, NO melody, NO vocals, NO singing, NO electronic beats]`;
 
+    // 🎯 Request dengan Struktur Payload Lengkap untuk MusicGen
     const hfResponse = await fetch(
-      "https://router.huggingface.co/hf-inference/models/facebook/musicgen-small",
+      "https://api-inference.huggingface.co/models/facebook/musicgen-small",
       {
         headers: {
           Authorization: `Bearer ${HF_TOKEN}`,
@@ -40,16 +42,21 @@ export default async function handler(req) {
           "x-wait-for-model": "true"
         },
         method: "POST",
-        body: JSON.stringify({ inputs: prompt }),
+        body: JSON.stringify({
+          inputs: promptText,
+          parameters: {
+            max_new_tokens: 256 // Membatasi durasi audio (~5-10 detik) agar generasi cepat & bebas error limit
+          }
+        }),
       }
     );
 
     if (!hfResponse.ok) {
       const errText = await hfResponse.text();
-      return new Response(JSON.stringify({ error: `HuggingFace Error (${hfResponse.status}): ${errText}` }), {
-        status: hfResponse.status,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: `HuggingFace API (${hfResponse.status}): ${errText}` }), 
+        { status: hfResponse.status, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     const audioData = await hfResponse.arrayBuffer();
@@ -63,9 +70,9 @@ export default async function handler(req) {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message || 'Gagal terhubung ke AI' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ error: error.message || 'Gagal terhubung ke server AI' }), 
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
