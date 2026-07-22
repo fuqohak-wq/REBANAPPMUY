@@ -12,6 +12,7 @@ export default async function handler(req) {
   try {
     const { style = 'banjari', lyrics = '' } = await req.json();
 
+    // 🔒 AMBIL GEMINI API KEY DARI VERCEL ENV
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
@@ -21,12 +22,12 @@ export default async function handler(req) {
       );
     }
 
-    // Prompt khusus ke Gemini untuk merancang pola ketukan Rebana
-    const promptText = `Kamu adalah pakar ketukan Rebana/Hadroh tradisional. 
-Tugasmu: Bikin pola ketukan perkusi rebana murni berbasis variabel tempo (BPM) dan urutan instrumen (Dung, Tak, Keprak, Bass) untuk gaya: "${style}".
+    // Prompt khusus ke Gemini untuk merancang komposisi ketukan Rebana
+    const promptText = `Kamu adalah pakar ritme perkusi Hadroh dan Rebana tradisional.
+Tugasmu: Buatkan pola ketukan perkusi rebana murni (instrumen: dung, tak, keprak) untuk gaya: "${style}".
 Lirik/Tema lagu: "${lyrics}".
 
-Kembalikan jawaban HANYA dalam format JSON valid berikut (tanpa Markdown ```json):
+Kembalikan jawaban HANYA berupa JSON valid berikut (TANPA teks tambahan, TANPA markdown \`\`\`json):
 {
   "bpm": 110,
   "pattern_name": "Hadroh Banjari",
@@ -35,13 +36,16 @@ Kembalikan jawaban HANYA dalam format JSON valid berikut (tanpa Markdown ```json
     {"time": 0.25, "sound": "tak"},
     {"time": 0.5, "sound": "keprak"},
     {"time": 0.75, "sound": "dung"},
-    {"time": 1.0, "sound": "tak"}
+    {"time": 1.0, "sound": "tak"},
+    {"time": 1.25, "sound": "dung"},
+    {"time": 1.5, "sound": "keprak"},
+    {"time": 1.75, "sound": "tak"}
   ]
 }`;
 
-    // Panggil Gemini API (v1beta / models)
+    // Panggil Endpoint Gemini API (v1beta)
     const geminiResponse = await fetch(
-      `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -62,7 +66,7 @@ Kembalikan jawaban HANYA dalam format JSON valid berikut (tanpa Markdown ```json
     const data = await geminiResponse.json();
     const rawText = data.candidates[0].content.parts[0].text;
     
-    // Bersihkan format jika Gemini menyisipkan tag markdown
+    // Bersihkan tag markdown jika ada
     const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     
     return new Response(cleanJson, {
