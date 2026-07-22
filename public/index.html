@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Rebana Generator</title>
+  <title>AI Rebana Generator (5-Min Player)</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
@@ -12,7 +12,7 @@
     <!-- Header -->
     <div class="text-center mb-6">
       <h1 class="text-3xl font-bold text-emerald-400">🥁 AI Rebana Generator</h1>
-      <p class="text-slate-400 text-sm mt-1">Pembuat iringan perkusi Hadroh & Rebana murni berbasis Gemini AI (Bebas Alat Musik Haram)</p>
+      <p class="text-slate-400 text-sm mt-1">Iringan Perkusi Hadroh & Rebana Murni (Bisa Diputar 5+ Menit Non-Stop)</p>
     </div>
 
     <!-- Form -->
@@ -27,41 +27,53 @@
       </div>
 
       <div>
-        <label class="block text-sm font-medium mb-1 text-slate-300">Lirik / Catatan Lagu (Opsional):</label>
-        <textarea id="lyricsInput" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="Masukkan lirik sholawat atau catatan untuk disimpan ke sheet..."></textarea>
+        <label class="block text-sm font-medium mb-1 text-slate-300">Target Durasi Putar:</label>
+        <select id="durationSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500">
+          <option value="60">1 Menit</option>
+          <option value="180">3 Menit</option>
+          <option value="300" selected>5 Menit (Standar Sholawat)</option>
+          <option value="600">10 Menit</option>
+        </select>
       </div>
 
-      <button id="generateBtn" onclick="generateRebana()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-emerald-900/40">
-        <span>Generate & Putar Irama Rebana</span>
+      <div>
+        <label class="block text-sm font-medium mb-1 text-slate-300">Lirik / Catatan (Opsional):</label>
+        <textarea id="lyricsInput" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="Masukkan lirik sholawat..."></textarea>
+      </div>
+
+      <button id="generateBtn" onclick="generateAndPlay()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-emerald-900/40">
+        <span>▶️ Buat & Putar Irama Rebana</span>
       </button>
     </div>
 
-    <!-- Loading Indicator -->
-    <div id="loading" class="hidden my-6 text-center">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
-      <p class="text-xs text-slate-400 mt-2">Gemini AI sedang merancang komposisi ketukan rebana (1-3 detik)...</p>
-    </div>
+    <!-- Player Controls -->
+    <div id="playerArea" class="hidden mt-6 p-5 bg-slate-900 rounded-xl border border-emerald-500/40 text-center space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-emerald-400" id="statusLabel">🔴 Memutar Irama...</span>
+        <span class="text-xs text-slate-400" id="timeLabel">00:00 / 05:00</span>
+      </div>
 
-    <!-- Result Area -->
-    <div id="resultArea" class="hidden mt-6 p-4 bg-slate-900 rounded-xl border border-emerald-500/30 text-center">
-      <h3 class="text-sm font-semibold text-emerald-400 mb-2">🎉 Ketukan Rebana Berhasil Diputar!</h3>
-      <p id="patternInfo" class="text-xs text-slate-400 mb-4"></p>
-      <button onclick="replaySound()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm px-4 py-2 rounded-lg font-medium transition">
-        🔄 Putar Ulang Irama
-      </button>
+      <p id="patternTitle" class="text-sm font-bold text-slate-200"></p>
+
+      <div class="flex gap-2 justify-center pt-2">
+        <button onclick="stopAudio()" class="bg-rose-600 hover:bg-rose-500 text-white text-sm px-6 py-2 rounded-lg font-bold transition">
+          ⏹️ Stop
+        </button>
+      </div>
     </div>
   </div>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec";
-
-    // Web Audio Synthesizer untuk Suara Perkusi Rebana
     let audioCtx;
-    let lastSequence = [];
+    let isPlaying = false;
+    let loopInterval;
+    let timerInterval;
+    let currentSeconds = 0;
+    let maxSeconds = 300;
 
     function playRebanaSound(type, timeOffset) {
-      if (!audioCtx) return;
-      
+      if (!audioCtx || !isPlaying) return;
+
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       const now = audioCtx.currentTime + timeOffset;
@@ -70,7 +82,6 @@
       gain.connect(audioCtx.destination);
 
       if (type === 'dung') {
-        // Suara Bass Rebana (Dung/Tumbuk)
         osc.type = 'sine';
         osc.frequency.setValueAtTime(140, now);
         osc.frequency.exponentialRampToValueAtTime(35, now + 0.3);
@@ -79,7 +90,6 @@
         osc.start(now);
         osc.stop(now + 0.3);
       } else {
-        // Suara High Drum (Tak/Keprak)
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(550, now);
         osc.frequency.exponentialRampToValueAtTime(180, now + 0.1);
@@ -90,79 +100,89 @@
       }
     }
 
-    function playPattern(sequence) {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+    function startLooping(sequence, durationInSeconds) {
+      stopAudio(); // Reset player
 
-      sequence.forEach(item => {
-        playRebanaSound(item.sound, item.time);
-      });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      isPlaying = true;
+      maxSeconds = durationInSeconds;
+      currentSeconds = 0;
+
+      // Hitung total durasi 1 siklus pola
+      const lastItem = sequence[sequence.length - 1];
+      const patternLength = (lastItem ? lastItem.time : 2) + 0.5;
+
+      // Fungsi pemutar 1 siklus
+      const playCycle = () => {
+        if (!isPlaying) return;
+        sequence.forEach(item => {
+          playRebanaSound(item.sound, item.time);
+        });
+      };
+
+      // Jalankan siklus pertama & set interval perulangan
+      playCycle();
+      loopInterval = setInterval(playCycle, patternLength * 1000);
+
+      // Timer durasi
+      updateTimerDisplay();
+      timerInterval = setInterval(() => {
+        currentSeconds++;
+        updateTimerDisplay();
+
+        if (currentSeconds >= maxSeconds) {
+          stopAudio();
+          alert("Durasi pemutaran irama rebana telah selesai!");
+        }
+      }, 1000);
+
+      document.getElementById('playerArea').classList.remove('hidden');
     }
 
-    function replaySound() {
-      if (lastSequence.length > 0) {
-        playPattern(lastSequence);
-      }
+    function stopAudio() {
+      isPlaying = false;
+      if (loopInterval) clearInterval(loopInterval);
+      if (timerInterval) clearInterval(timerInterval);
+      if (audioCtx) audioCtx.close();
+      document.getElementById('playerArea').classList.add('hidden');
     }
 
-    async function generateRebana() {
+    function updateTimerDisplay() {
+      const curMin = String(Math.floor(currentSeconds / 60)).padStart(2, '0');
+      const curSec = String(currentSeconds % 60).padStart(2, '0');
+      const maxMin = String(Math.floor(maxSeconds / 60)).padStart(2, '0');
+      const maxSec = String(maxSeconds % 60).padStart(2, '0');
+
+      document.getElementById('timeLabel').innerText = `${curMin}:${curSec} / ${maxMin}:${maxSec}`;
+    }
+
+    async function generateAndPlay() {
       const style = document.getElementById('styleSelect').value;
       const lyrics = document.getElementById('lyricsInput').value;
+      const duration = parseInt(document.getElementById('durationSelect').value);
       const btn = document.getElementById('generateBtn');
-      const loading = document.getElementById('loading');
-      const resultArea = document.getElementById('resultArea');
-      const patternInfo = document.getElementById('patternInfo');
 
       btn.disabled = true;
-      btn.classList.add('opacity-50');
-      loading.classList.remove('hidden');
-      resultArea.classList.add('hidden');
+      btn.innerText = "Processing...";
 
       try {
-        // 1. Minta komposisi ritme dari Gemini AI via Vercel Backend
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ style, lyrics })
         });
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({ error: 'Gagal merespons server' }));
-          throw new Error(errData.error || `Server Error (${response.status})`);
-        }
-
         const patternData = await response.json();
+        document.getElementById('patternTitle').innerText = patternData.pattern_name || "Pola Rebana Hadroh";
 
-        if (patternData.sequence && Array.isArray(patternData.sequence)) {
-          lastSequence = patternData.sequence;
-          playPattern(lastSequence);
-
-          patternInfo.innerText = `Pola: ${patternData.pattern_name || style} | BPM: ${patternData.bpm || 110}`;
-          resultArea.classList.remove('hidden');
-        } else {
-          throw new Error("Format pola musik dari AI tidak valid");
-        }
-
-        // 2. Simpan Log ke Google Apps Script (Background)
-        if (GAS_URL) {
-          fetch(GAS_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ style, lyrics })
-          }).catch(e => console.log("GAS Log Error:", e));
-        }
+        // Mulai memutar suara looping selama durasi yang dipilih
+        startLooping(patternData.sequence, duration);
 
       } catch (err) {
-        alert("Detail Error: " + err.message);
+        alert("Gagal memproses irama: " + err.message);
       } finally {
         btn.disabled = false;
-        btn.classList.remove('opacity-50');
-        loading.classList.add('hidden');
+        btn.innerText = "▶️ Buat & Putar Irama Rebana";
       }
     }
   </script>
