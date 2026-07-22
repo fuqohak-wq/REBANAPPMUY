@@ -1,22 +1,25 @@
 // api/generate.js
-
-// 💡 Mengaktifkan Edge Runtime agar Vercel tidak timeout di detik ke-10
 export const config = {
   runtime: 'edge',
 };
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
 
   try {
     const { style = 'banjari' } = await req.json();
 
-    const HF_TOKEN = process.env.HF_TOKEN || "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";
+    // 🔒 AMBIL DARI VERCEL ENV (TIDAK ADA STRING TOKEN DI SINI)
+    const HF_TOKEN = process.env.HF_TOKEN;
+
+    if (!HF_TOKEN) {
+      return new Response(JSON.stringify({ error: 'HF_TOKEN belum dipasang di Vercel Environment Variables!' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     const stylePrompts = {
       banjari: "fast energetic Hadroh Banjari style, rapid frame drum rolls, high energy tempo, syncopated Islamic percussion",
@@ -26,10 +29,8 @@ export default async function handler(req) {
 
     const selectedStyle = stylePrompts[style] || stylePrompts.banjari;
 
-    // 🔒 PROMPT KETAT (Perkusi Murni)
     const prompt = `Solo acoustic frame drum performance, traditional rebana percussion, ${selectedStyle}, pure percussion ensemble, organic acoustic wood and skin sound, dynamic rhythm. [STRICT INSTRUCTION: Pure acoustic percussion only. NO piano, NO guitar, NO synth, NO bass, NO flute, NO strings, NO melody, NO vocals, NO singing, NO electronic beats]`;
 
-    // Direct Inference Router Endpoint
     const hfResponse = await fetch(
       "https://router.huggingface.co/hf-inference/models/facebook/musicgen-small",
       {
@@ -51,7 +52,6 @@ export default async function handler(req) {
       });
     }
 
-    // Direct Streaming Response (Sangat Cepat & Bebas Timeout Vercel)
     const audioData = await hfResponse.arrayBuffer();
 
     return new Response(audioData, {
