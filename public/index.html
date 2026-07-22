@@ -54,57 +54,61 @@
 
   <script>
     // MASUKKAN URL GOOGLE APPS SCRIPT WEB APP KAMU DI SINI (Opsional)
-    const GAS_URL = "URL_GOOGLE_APPS_SCRIPT_KAMU";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec";
 
-    async function generateRebana() {
-      const style = document.getElementById('styleSelect').value;
-      const lyrics = document.getElementById('lyricsInput').value;
-      const btn = document.getElementById('generateBtn');
-      const loading = document.getElementById('loading');
-      const resultArea = document.getElementById('resultArea');
-      const audioPlayer = document.getElementById('audioPlayer');
-      const downloadBtn = document.getElementById('downloadBtn');
+async function generateRebana() {
+  const style = document.getElementById('styleSelect').value;
+  const lyrics = document.getElementById('lyricsInput').value;
+  const btn = document.getElementById('generateBtn');
+  const loading = document.getElementById('loading');
+  const resultArea = document.getElementById('resultArea');
+  const audioPlayer = document.getElementById('audioPlayer');
+  const downloadBtn = document.getElementById('downloadBtn');
 
-      btn.disabled = true;
-      btn.classList.add('opacity-50');
-      loading.classList.remove('hidden');
-      resultArea.classList.add('hidden');
+  btn.disabled = true;
+  btn.classList.add('opacity-50');
+  loading.classList.remove('hidden');
+  resultArea.classList.add('hidden');
 
-      try {
-        // 1. Panggil Vercel Serverless Function
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ style, lyrics })
-        });
+  try {
+    // 1. Panggil Vercel Serverless Function
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ style, lyrics })
+    });
 
-        if (!response.ok) throw new Error("Gagal generate audio");
-
-        const blob = await response.blob();
-        const audioUrl = URL.createObjectURL(blob);
-
-        audioPlayer.src = audioUrl;
-        downloadBtn.href = audioUrl;
-        resultArea.classList.remove('hidden');
-
-        // 2. Simpan Log ke Google Apps Script (Opsional / Background)
-        if (GAS_URL && GAS_URL !== "https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec") {
-          fetch(GAS_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ style, lyrics })
-          }).catch(err => console.log("GAS Log Error:", err));
-        }
-
-      } catch (err) {
-        alert("Terjadi kesalahan: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50');
-        loading.classList.add('hidden');
-      }
+    // IF ERROR: Baca pesan detail dari backend
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({ error: 'Gagal memproses respon server' }));
+      throw new Error(errData.error || `Server Error (${response.status})`);
     }
+
+    const blob = await response.blob();
+    const audioUrl = URL.createObjectURL(blob);
+
+    audioPlayer.src = audioUrl;
+    downloadBtn.href = audioUrl;
+    resultArea.classList.remove('hidden');
+
+    // 2. Simpan Log ke Google Apps Script (Background)
+    if (typeof GAS_URL !== 'undefined' && GAS_URL && !GAS_URL.includes("URL_GOOGLE_APPS_SCRIPT_KAMU")) {
+      fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style, lyrics })
+      }).catch(err => console.log("GAS Log Error:", err));
+    }
+
+  } catch (err) {
+    alert("Detail Error: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-50');
+    loading.classList.add('hidden');
+  }
+}
   </script>
 </body>
 </html>
