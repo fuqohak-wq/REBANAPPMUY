@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Rebana Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="max-w-xl w-full bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl">
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-emerald-400">🥁 AI Rebana Generator</h1>
+      <p class="text-slate-400 text-sm mt-1">Pembuat iringan perkusi Hadroh & Rebana murni berbasis AI (Bebas Alat Musik Haram)</p>
+    </div>
+
+    <!-- Form -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1 text-slate-300">Pilih Gaya Ketukan Rebana:</label>
+        <select id="styleSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500">
+          <option value="banjari">Hadroh Banjari (Cepat & Energetik)</option>
+          <option value="habibi">Habibi / Duff Rhythm (Sedang)</option>
+          <option value="slow">Hadroh Pelan / Meditatif (Slow Beat)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1 text-slate-300">Lirik / Catatan Lagu (Opsional):</label>
+        <textarea id="lyricsInput" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-emerald-500" placeholder="Masukkan lirik sholawat atau catatan untuk disimpan ke sheet..."></textarea>
+      </div>
+
+      <button id="generateBtn" onclick="generateRebana()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-lg shadow-emerald-900/40">
+        <span>Generate Irama Rebana</span>
+      </button>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="hidden my-6 text-center">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
+      <p class="text-xs text-slate-400 mt-2">Sedang memproses ketukan rebana via AI (membutuhkan 10-30 detik)...</p>
+    </div>
+
+    <!-- Result Player -->
+    <div id="resultArea" class="hidden mt-6 p-4 bg-slate-900 rounded-xl border border-emerald-500/30">
+      <h3 class="text-sm font-semibold text-emerald-400 mb-2 text-center">🎉 Hasil Irama Rebana AI:</h3>
+      <audio id="audioPlayer" controls class="w-full mb-3"></audio>
+      <a id="downloadBtn" download="rebana-ai.wav" class="block text-center bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm py-2 rounded-lg font-medium transition">
+        ⬇️ Download File Audio (.WAV)
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // MASUKKAN URL GOOGLE APPS SCRIPT WEB APP KAMU DI SINI (Opsional)
+    const GAS_URL = "URL_GOOGLE_APPS_SCRIPT_KAMU";
+
+    async function generateRebana() {
+      const style = document.getElementById('styleSelect').value;
+      const lyrics = document.getElementById('lyricsInput').value;
+      const btn = document.getElementById('generateBtn');
+      const loading = document.getElementById('loading');
+      const resultArea = document.getElementById('resultArea');
+      const audioPlayer = document.getElementById('audioPlayer');
+      const downloadBtn = document.getElementById('downloadBtn');
+
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+      loading.classList.remove('hidden');
+      resultArea.classList.add('hidden');
+
+      try {
+        // 1. Panggil Vercel Serverless Function
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ style, lyrics })
+        });
+
+        if (!response.ok) throw new Error("Gagal generate audio");
+
+        const blob = await response.blob();
+        const audioUrl = URL.createObjectURL(blob);
+
+        audioPlayer.src = audioUrl;
+        downloadBtn.href = audioUrl;
+        resultArea.classList.remove('hidden');
+
+        // 2. Simpan Log ke Google Apps Script (Opsional / Background)
+        if (GAS_URL && GAS_URL !== "https://script.google.com/macros/s/AKfycbwOQrq_I95t0SA4kX_ZSRexLetuQyU7Q2uGXlC0YVk6xmdXOAj7RfjSodIoBP9sqX28uA/exec") {
+          fetch(GAS_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ style, lyrics })
+          }).catch(err => console.log("GAS Log Error:", err));
+        }
+
+      } catch (err) {
+        alert("Terjadi kesalahan: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+        loading.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
