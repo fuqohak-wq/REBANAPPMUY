@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator - Full Track Engine</title>
+  <title>AI Music Video Creator (Smart Sequential Slicer)</title>
   <style>
     :root {
       --bg: #f0fdf4;
@@ -89,7 +89,7 @@
 
 <div class="container">
   <h1>🌿 AI Music Video Creator</h1>
-  <p class="subtitle">Full-Track Precision Alignment Engine</p>
+  <p class="subtitle">Smart Sequential Precision Engine</p>
 
   <div class="form-group">
     <label for="audioInput">🎵 1. Upload File Audio MP3:</label>
@@ -102,7 +102,7 @@
   </div>
 
   <div class="form-group">
-    <label for="lyricsInput">📝 3. Tempel Lirik Teks Asli (Wajib):</label>
+    <label for="lyricsInput">📝 3. Tempel Lirik Teks Asli (Berurutan per baris):</label>
     <textarea id="lyricsInput" placeholder="Tempel seluruh lirik lagu di sini secara berurutan per baris..."></textarea>
   </div>
 
@@ -146,6 +146,8 @@
 </div>
 
 <script>
+  const CHUNK_DURATION = 45; // Chunk audio 45 detik agar ringan (~1MB)
+
   const labelLebar = document.getElementById('labelLebar');
   const labelTegak = document.getElementById('labelTegak');
   const radioInputs = document.querySelectorAll('input[name="aspectRatio"]');
@@ -175,7 +177,7 @@
   startBtn.addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
     const bgFile = document.getElementById('bgInput').files[0];
-    const userLyrics = document.getElementById('lyricsInput').value;
+    const rawLyricsText = document.getElementById('lyricsInput').value;
     const aspectRatio = document.querySelector('input[name="aspectRatio"]:checked').value;
     const selectedEffect = document.getElementById('effectSelect').value;
 
@@ -183,8 +185,8 @@
       return alert("Upload File Audio MP3 dan Gambar/Video Background terlebih dahulu!");
     }
 
-    if (!userLyrics.trim()) {
-      return alert("Harap masukkan lirik lagu terlebih dahulu di kotak nomor 3 agar urutannya presisi!");
+    if (!rawLyricsText.trim()) {
+      return alert("Harap tempelkan lirik lagu secara berurutan di kotak nomor 3!");
     }
 
     if (aspectRatio === '16:9') {
@@ -199,40 +201,67 @@
       progressContainer.style.display = "block";
       previewArea.style.display = "block";
 
-      progressBar.style.width = "30%";
-      statusText.innerText = "⏳ Membaca lagu utuh & menyelaraskan lirik dengan Gemini AI...";
+      statusText.innerText = "⏳ Membaca audio & membagi baris lirik sekuensil...";
+      
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await audioFile.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      
+      const totalDuration = audioBuffer.duration;
+      const totalChunks = Math.ceil(totalDuration / CHUNK_DURATION);
 
-      // MENGIRIM AUDIO UTUH TANPA CHUNKING
-      const base64Audio = await blobToBase64(audioFile);
+      // PECAH TEKS LIRIK DENGAN RAPI MENJADI ARRAY PER BARIS
+      const lyricLines = rawLyricsText
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0 && !l.startsWith('[')); // Hapus baris kosong & tag [Chorus]/[Intro]
 
-      const res = await fetch('/api/transcribe-chunk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioBase64: base64Audio.split(',')[1],
-          mimeType: audioFile.type || 'audio/mp3',
-          providedLyrics: userLyrics
-        })
-      });
+      const linesPerChunk = Math.ceil(lyricLines.length / totalChunks);
+      let rawSrtText = "";
 
-      const responseText = await res.text();
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Server Error: ${responseText.substring(0, 100)}...`);
+      for (let i = 0; i < totalChunks; i++) {
+        const startSec = i * CHUNK_DURATION;
+        const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
+        const actualDuration = endSec - startSec;
+        
+        // POTONG TEKS LIRIK HANYA UNTUK BAGIAN CHUNK INI (SEKUENSIL)
+        const chunkLyricLines = lyricLines.slice(i * linesPerChunk, (i + 1) * linesPerChunk);
+        const chunkLyricsText = chunkLyricLines.join('\n');
+
+        progressBar.style.width = `${Math.round(((i + 1) / totalChunks) * 50)}%`;
+        statusText.innerText = `🔄 Gemini menyelaraskan lirik bagian ${i + 1} dari ${totalChunks} (Detik ${Math.floor(startSec)}s - ${Math.floor(endSec)}s)...`;
+
+        const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
+        const base64Audio = await blobToBase64(chunkBlob);
+
+        const res = await fetch('/api/transcribe-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioBase64: base64Audio.split(',')[1],
+            mimeType: 'audio/wav',
+            offsetSeconds: Math.floor(startSec),
+            duration: Math.floor(actualDuration),
+            chunkLyrics: chunkLyricsText // Hanya kirim potongan lirik sekuensil!
+          })
+        });
+
+        const responseText = await res.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Server Error: ${responseText.substring(0, 100)}...`);
+        }
+
+        if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
+        rawSrtText += (data.srt || "") + "\n\n";
       }
 
-      if (!res.ok) throw new Error(data.error || "Gagal menyelaraskan lirik");
-
-      srtSubtitles = parseSRT(data.srt || "");
+      srtSubtitles = parseSRT(rawSrtText);
       console.log("SRT Result:", srtSubtitles);
+      progressBar.style.width = "60%";
 
-      if (srtSubtitles.length === 0) {
-        throw new Error("Gagal mengekstrak timestamp dari lirik. Coba jalankan ulang.");
-      }
-
-      progressBar.style.width = "70%";
       statusText.innerText = "🎥 Memulai pemutaran & perekaman MP4...";
       initParticles(selectedEffect, canvas.width, canvas.height);
 
@@ -383,6 +412,20 @@
     return items;
   }
 
+  async function sliceAndCompressAudio(buffer, startSec, endSec) {
+    const targetSampleRate = 16000; // Kompresi mono 16kHz agar super ringan (~1MB)
+    const duration = endSec - startSec;
+    const offlineCtx = new OfflineAudioContext(1, duration * targetSampleRate, targetSampleRate);
+
+    const source = offlineCtx.createBufferSource();
+    source.buffer = buffer;
+    source.start(0, startSec, duration);
+    source.connect(offlineCtx.destination);
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    return audioBufferToWavBlob(renderedBuffer);
+  }
+
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -390,6 +433,35 @@
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  }
+
+  function audioBufferToWavBlob(buffer) {
+    const numOfChan = buffer.numberOfChannels,
+      length = buffer.length * numOfChan * 2 + 44,
+      out = new DataView(new ArrayBuffer(length)),
+      channels = [], sampleRate = buffer.sampleRate;
+    let sample, offset = 0, pos = 0;
+
+    function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+    function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+    setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+    setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+    setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
+    setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164);
+    setUint32(length - pos - 4);
+
+    for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+    while (offset < buffer.length) {
+      for (let i = 0; i < numOfChan; i++) {
+        sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+        out.setInt16(pos, sample, true); pos += 2;
+      }
+      offset++;
+    }
+    return new Blob([out], { type: 'audio/wav' });
   }
 
   function initParticles(effect, w, h) {
