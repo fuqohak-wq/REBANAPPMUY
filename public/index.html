@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Secure MP4/WEBM)</title>
+  <title>AI Music Video Creator (Fix Payload 413)</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -34,130 +34,39 @@
       background: var(--card);
       padding: 28px;
       border-radius: 20px;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5);
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
       border: 1px solid var(--border);
     }
-    h1 {
-      text-align: center;
-      color: #818cf8;
-      margin: 0 0 8px 0;
-      font-size: 1.8rem;
-    }
-    p.subtitle {
-      text-align: center;
-      color: var(--subtext);
-      margin-top: 0;
-      margin-bottom: 24px;
-      font-size: 0.95rem;
-    }
-    .grid-form {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 640px) {
-      .grid-form { grid-template-columns: 1fr; }
-    }
-    .form-group {
-      margin-bottom: 16px;
-    }
-    label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: #cbd5e1;
-    }
+    h1 { text-align: center; color: #818cf8; margin: 0 0 8px 0; font-size: 1.8rem; }
+    p.subtitle { text-align: center; color: var(--subtext); margin-top: 0; margin-bottom: 24px; font-size: 0.95rem; }
+    .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .grid-form { grid-template-columns: 1fr; } }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; color: #cbd5e1; }
     input, select, button {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #0f172a;
-      color: var(--text);
-      box-sizing: border-box;
-      font-size: 0.95rem;
-      outline: none;
-      transition: all 0.2s ease;
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+      background: #0f172a; color: var(--text); box-sizing: border-box; font-size: 0.95rem; outline: none;
     }
-    input:focus, select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-    }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: bold;
-      background: #312e81;
-      color: #a5b4fc;
-      margin-left: 6px;
-    }
-    .btn-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    button {
-      background: var(--accent);
-      color: white;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-    }
-    button:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
-    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; opacity: 0.7; }
+    button { background: var(--accent); color: white; font-weight: 600; border: none; cursor: pointer; margin-top: 10px; }
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
     button.download-btn { background: var(--success); }
     button.download-btn:hover:not(:disabled) { background: var(--success-hover); }
-
-    .preview-zone {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 24px;
-      background: #090d16;
-      padding: 16px;
-      border-radius: 12px;
-      border: 1px dashed var(--border);
-    }
-    canvas {
-      background: #000;
-      border-radius: 8px;
-      max-width: 100%;
-      height: auto;
-      max-height: 480px;
-      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
-    }
-    .status-box {
-      margin-top: 12px;
-      padding: 10px 16px;
-      background: #1e293b;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      color: #38bdf8;
-      text-align: center;
-      width: 100%;
-      box-sizing: border-box;
-      border-left: 4px solid #38bdf8;
-    }
+    .preview-zone { display: flex; flex-direction: column; align-items: center; margin-top: 24px; background: #090d16; padding: 16px; border-radius: 12px; }
+    canvas { background: #000; border-radius: 8px; max-width: 100%; height: auto; max-height: 480px; }
+    .status-box { margin-top: 12px; padding: 10px 16px; background: #1e293b; border-radius: 8px; font-size: 0.88rem; color: #38bdf8; text-align: center; width: 100%; border-left: 4px solid #38bdf8; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <h1>🎬 AI Music Video Creator</h1>
-  <p class="subtitle">Otomatisasi Lirik dengan Gemini 2.5 Flash (Aman & Siap MP4)</p>
+  <p class="subtitle">Otomatisasi Lirik Gemini 2.5 Flash (Auto Audio Compressor Enabled)</p>
 
   <div class="grid-form">
     <div class="form-group">
       <label for="audioInput">1. File Audio MP3:</label>
-      <input type="file" id="audioInput" accept="audio/mp3, audio/wav, audio/m4a">
+      <input type="file" id="audioInput" accept="audio/*">
     </div>
 
     <div class="form-group">
@@ -166,26 +75,24 @@
     </div>
 
     <div class="form-group">
-      <label for="aspectRatio">3. Format / Ukuran Video:</label>
+      <label for="aspectRatio">3. Format Video:</label>
       <select id="aspectRatio">
-        <option value="16:9">Memanjang / Landscape 16:9 (YouTube Video / TV)</option>
-        <option value="9:16">Meninggi / Portrait 9:16 (YouTube Shorts / Reels / TikTok)</option>
+        <option value="16:9">Memanjang / Landscape 16:9 (YouTube)</option>
+        <option value="9:16">Meninggi / Portrait 9:16 (Shorts / TikTok / Reels)</option>
       </select>
     </div>
 
     <div class="form-group">
-      <label for="videoFormat">4. Format Output Download: <span class="badge" id="codecBadge">Auto Detect</span></label>
+      <label for="videoFormat">4. Format Output:</label>
       <select id="videoFormat"></select>
     </div>
   </div>
 
-  <div class="btn-group">
-    <button id="processBtn">✨ 1. Analisis Lirik & Timestamp via AI</button>
-    <button id="renderBtn" disabled>▶️ 2. Putar & Rekam Video Canvas</button>
-    <button id="downloadBtn" class="download-btn" disabled>💾 3. Unduh Video Siap Upload</button>
-  </div>
+  <button id="processBtn">✨ 1. Kompres & Analisis Lirik via AI</button>
+  <button id="renderBtn" disabled>▶️ 2. Putar & Rekam Video Canvas</button>
+  <button id="downloadBtn" class="download-btn" disabled>💾 3. Unduh Video Siap Upload</button>
 
-  <div class="status-box" id="statusText">Status: Silakan pilih file MP3 dan Foto Anda.</div>
+  <div class="status-box" id="statusText">Status: Pilih file audio MP3 Anda.</div>
 
   <div class="preview-zone">
     <canvas id="videoCanvas"></canvas>
@@ -193,7 +100,7 @@
 </div>
 
 <script>
-  let audioBuffer = null;
+  let rawAudioBuffer = null;
   let audioContext = null;
   let audioSource = null;
   let analyser = null;
@@ -207,23 +114,18 @@
   const ctx = canvas.getContext('2d');
   const statusText = document.getElementById('statusText');
   const formatSelect = document.getElementById('videoFormat');
-  const codecBadge = document.getElementById('codecBadge');
 
-  // Deteksi Format yang Didukung Browser
   function detectSupportedFormats() {
     formatSelect.innerHTML = '';
     const formats = [
-      { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4', label: 'MP4 (H.264 / AAC) - Siap Sosmed' },
-      { mime: 'video/mp4;codecs=vp9,mp4a.40.2', ext: 'mp4', label: 'MP4 (VP9 / AAC) - Standar Baru MP4' },
-      { mime: 'video/mp4', ext: 'mp4', label: 'MP4 Video Standard' },
-      { mime: 'video/webm;codecs=vp9,opus', ext: 'webm', label: 'WEBM (VP9 / Opus) - Sangat Jernih' },
+      { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4', label: 'MP4 (Siap Sosmed)' },
+      { mime: 'video/mp4', ext: 'mp4', label: 'MP4 Standard' },
+      { mime: 'video/webm;codecs=vp9,opus', ext: 'webm', label: 'WEBM (Sangat Jernih)' },
       { mime: 'video/webm', ext: 'webm', label: 'WEBM Standard' }
     ];
 
-    let supportedList = [];
     formats.forEach(item => {
       if (MediaRecorder.isTypeSupported(item.mime)) {
-        supportedList.push(item);
         const opt = document.createElement('option');
         opt.value = item.mime;
         opt.dataset.ext = item.ext;
@@ -231,32 +133,14 @@
         formatSelect.appendChild(opt);
       }
     });
-
-    if (supportedList.length > 0) {
-      selectedMimeType = supportedList[0].mime;
-      codecBadge.textContent = supportedList[0].ext.toUpperCase() + ' Ready';
-    } else {
-      codecBadge.textContent = 'Fallback';
-    }
+    if (formatSelect.options.length > 0) selectedMimeType = formatSelect.value;
   }
-
   detectSupportedFormats();
-
-  formatSelect.addEventListener('change', (e) => {
-    selectedMimeType = e.target.value;
-    const selectedOpt = e.target.options[e.target.selectedIndex];
-    codecBadge.textContent = selectedOpt.dataset.ext.toUpperCase();
-  });
 
   function updateCanvasDimensions() {
     const ratio = document.getElementById('aspectRatio').value;
-    if (ratio === '16:9') {
-      canvas.width = 1280;
-      canvas.height = 720;
-    } else {
-      canvas.width = 720;
-      canvas.height = 1280;
-    }
+    canvas.width = ratio === '16:9' ? 1280 : 720;
+    canvas.height = ratio === '16:9' ? 720 : 1280;
   }
   document.getElementById('aspectRatio').addEventListener('change', updateCanvasDimensions);
   updateCanvasDimensions();
@@ -270,62 +154,101 @@
     }
   });
 
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
+  // Function Mengompres Audio menjadi ringan (Mono 16kHz WAV) khusus untuk dikirim ke Gemini AI
+  async function compressAudioForGemini(audioBuffer) {
+    const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineCtx.destination);
+    source.start();
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    const wavBlob = bufferToWavBlob(renderedBuffer);
+    
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = error => reject(error);
-      reader.readAsDataURL(file);
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(wavBlob);
     });
   }
 
-  // 1. Panggil Vercel Serverless Function (/api/analyze)
+  function bufferToWavBlob(buffer) {
+    const numOfChan = buffer.numberOfChannels,
+          length = buffer.length * numOfChan * 2 + 44,
+          out = new DataView(new ArrayBuffer(length)),
+          channels = [], sampleRate = buffer.sampleRate;
+    let offset = 44, pos = 0;
+
+    function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+    function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+    setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+    setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+    setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
+    setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
+
+    for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+    while (pos < length) {
+      for (let i = 0; i < numOfChan; i++) {
+        let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+        out.setInt16(pos, sample, true); pos += 2;
+      }
+      offset++;
+    }
+    return new Blob([out], { type: 'audio/wav' });
+  }
+
+  // Process Click
   document.getElementById('processBtn').addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
+    if (!audioFile) return alert("Pilih file audio terlebih dahulu!");
 
-    if (!audioFile) {
-      alert("Mohon sertakan file audio MP3!");
-      return;
-    }
-
-    statusText.innerText = "⏳ Sedang memproses audio dengan Gemini 2.5 Flash di Backend Vercel...";
+    statusText.innerText = "⚡ 1/2 Membaca & Mengompres Audio agar muat dikirim...";
 
     try {
-      const base64Audio = await fileToBase64(audioFile);
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await audioFile.arrayBuffer();
+      rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      // Memanggil Serverless Backend (API Key tersembunyi dengan aman di server)
+      // Kompres audio secara otomatis di browser
+      const base64LightAudio = await compressAudioForGemini(rawAudioBuffer);
+
+      statusText.innerText = "⏳ 2/2 Mengirim ke Gemini 2.5 Flash via Serverless Vercel...";
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          base64Audio: base64Audio,
-          mimeType: audioFile.type || 'audio/mp3'
+          base64Audio: base64LightAudio,
+          mimeType: 'audio/wav'
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Terjadi kesalahan sistem.');
+      const textRes = await response.text();
+      let data;
+      try {
+        data = JSON.parse(textRes);
+      } catch (e) {
+        throw new Error("Respon Server Bukan JSON: " + textRes.substring(0, 100));
       }
+
+      if (!response.ok) throw new Error(data.error || 'Gagal berkomunikasi dengan AI');
 
       let rawText = data.candidates[0].content.parts[0].text;
       rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       lyricsData = JSON.parse(rawText);
 
-      statusText.innerText = `✅ Berhasil! Gemini mendeteksi ${lyricsData.length} baris lirik. Siap untuk diputar & direkam.`;
+      statusText.innerText = `✅ Berhasil! Ditemukan ${lyricsData.length} baris lirik. Siap diputar & direkam.`;
       document.getElementById('renderBtn').disabled = false;
-
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const arrayBuffer = await audioFile.arrayBuffer();
-      audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
     } catch (err) {
       console.error(err);
-      statusText.innerText = "❌ Gagal memproses: " + err.message;
+      statusText.innerText = "❌ Error: " + err.message;
     }
   });
 
-  // 2. Loop Render Frame (Ken Burns + Audio Wave + Lyric)
+  // Render Loop
   let startTime = 0;
   let isPlaying = false;
 
@@ -333,15 +256,11 @@
     if (!isPlaying) return;
 
     const currentTime = audioContext.currentTime - startTime;
-    const duration = audioBuffer.duration;
-
-    if (currentTime > duration) {
+    if (currentTime > rawAudioBuffer.duration) {
       isPlaying = false;
-      statusText.innerText = "🎉 Selesai merekam video! Klik tombol 'Unduh Video' di bawah.";
+      statusText.innerText = "🎉 Selesai merekam video! Klik 'Unduh Video'.";
       document.getElementById('downloadBtn').disabled = false;
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-      }
+      if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
       return;
     }
 
@@ -354,7 +273,6 @@
       if (img.complete) {
         const progress = (currentTime % 4) / 4;
         const scale = 1 + (progress * 0.08);
-        
         ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.scale(scale, scale);
@@ -367,7 +285,6 @@
     if (analyser) {
       const freqData = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(freqData);
-
       ctx.fillStyle = 'rgba(99, 102, 241, 0.4)';
       const barWidth = (canvas.width / freqData.length) * 2;
       let x = 0;
@@ -385,19 +302,18 @@
       ctx.shadowBlur = 16;
       ctx.font = `bold ${canvas.width * 0.048}px sans-serif`;
       ctx.textAlign = 'center';
-      
       ctx.fillText(currentLyric.text, canvas.width / 2, canvas.height * 0.75);
     }
 
     requestAnimationFrame(renderFrame);
   }
 
-  // 3. Rekam Video Realtime
+  // Start Play & Record
   document.getElementById('renderBtn').addEventListener('click', () => {
-    if (!audioBuffer) return;
+    if (!rawAudioBuffer) return;
 
     audioSource = audioContext.createBufferSource();
-    audioSource.buffer = audioBuffer;
+    audioSource.buffer = rawAudioBuffer; // Memakai Kualitas Asli Jernih untuk Hasil Output Video
 
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 128;
@@ -414,8 +330,7 @@
     ]);
 
     recordedChunks = [];
-    const options = selectedMimeType ? { mimeType: selectedMimeType } : {};
-    
+    const options = formatSelect.value ? { mimeType: formatSelect.value } : {};
     try {
       mediaRecorder = new MediaRecorder(combinedStream, options);
     } catch (e) {
@@ -423,23 +338,20 @@
     }
 
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-
     mediaRecorder.start();
     audioSource.start(0);
     startTime = audioContext.currentTime;
     isPlaying = true;
 
-    statusText.innerText = "⏺️ Merekam video secara realtime... Biarkan lagu berputar hingga selesai.";
+    statusText.innerText = "⏺️ Merekam video... Tunggu hingga lagu selesai.";
     renderFrame();
   });
 
-  // 4. Download File Video
+  // Download
   document.getElementById('downloadBtn').addEventListener('click', () => {
     const selectedOpt = formatSelect.options[formatSelect.selectedIndex];
     const ext = selectedOpt ? selectedOpt.dataset.ext : 'mp4';
-    const mime = mediaRecorder.mimeType || 'video/mp4';
-
-    const blob = new Blob(recordedChunks, { type: mime });
+    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
