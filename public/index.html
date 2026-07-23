@@ -3,39 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Whisper GPU & FFmpeg Engine)</title>
+  <title>AI Music Video Creator (Gemini Auto-Chunking)</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --accent: #6366f1;
-      --accent-hover: #4f46e5;
-      --success: #10b981;
-      --success-hover: #059669;
-      --text: #f8fafc;
-      --subtext: #94a3b8;
-      --border: #334155;
+      --bg: #0f172a; --card: #1e293b; --accent: #6366f1;
+      --accent-hover: #4f46e5; --text: #f8fafc; --subtext: #94a3b8; --border: #334155;
     }
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 24px 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background-color: var(--bg); color: var(--text);
+      margin: 0; padding: 24px 16px; display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; box-sizing: border-box;
     }
     .container {
-      max-width: 650px;
-      width: 100%;
-      background: var(--card);
-      padding: 28px;
-      border-radius: 20px;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
-      border: 1px solid var(--border);
+      max-width: 650px; width: 100%; background: var(--card); padding: 28px;
+      border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); border: 1px solid var(--border);
     }
     h1 { text-align: center; color: #818cf8; margin: 0 0 8px 0; font-size: 1.8rem; }
     p.subtitle { text-align: center; color: var(--subtext); margin-top: 0; margin-bottom: 24px; font-size: 0.95rem; }
@@ -48,113 +30,162 @@
     button { background: var(--accent); color: white; font-weight: 600; border: none; cursor: pointer; margin-top: 10px; }
     button:hover:not(:disabled) { background: var(--accent-hover); }
     button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
-    button.download-btn { background: var(--success); }
-    button.download-btn:hover:not(:disabled) { background: var(--success-hover); }
-    .status-box { margin-top: 20px; padding: 14px 16px; background: #0f172a; border-radius: 10px; font-size: 0.9rem; color: #38bdf8; text-align: center; border-left: 4px solid #38bdf8; }
-    .info-badge { background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; text-align: center; line-height: 1.4; }
+    .progress-container { width: 100%; background-color: #0f172a; border-radius: 10px; height: 12px; margin-top: 15px; overflow: hidden; display: none; }
+    .progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s; }
+    .status-box { margin-top: 15px; padding: 12px; background: #0f172a; border-radius: 10px; font-size: 0.85rem; color: #38bdf8; text-align: center; border-left: 4px solid #38bdf8; }
+    textarea { width: 100%; height: 180px; background: #0f172a; color: #a5f3fc; border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-top: 15px; font-family: monospace; box-sizing: border-box; display: none; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <h1>🎬 AI Music Video Creator</h1>
-  <p class="subtitle">Google Colab GPU + OpenAI Whisper + FFmpeg Engine</p>
-
-  <div class="info-badge">
-    ⚡ <b>Ditenagai Server GPU Colab:</b> Proses transkripsi lirik & rendering dilakukan di Cloud. Setelah klik Start, <b>kamu bebas menutup tab/browser ini dan ditinggal tidur!</b>
-  </div>
+  <p class="subtitle">100% Vercel Engine + Gemini Smart Auto-Chunking</p>
 
   <div class="form-group">
-    <label for="audioInput">1. File Audio MP3 (Bebas Berapapun Durasinya):</label>
+    <label for="audioInput">1. File Audio MP3 (Bebas 1-2 Jam):</label>
     <input type="file" id="audioInput" accept="audio/*">
   </div>
 
-  <div class="form-group">
-    <label for="imageInput">2. Foto Poster / Background Video:</label>
-    <input type="file" id="imageInput" accept="image/*">
+  <button id="startBtn">🚀 Ekstrak Lirik Presisi (Auto-Chunk 3 Menit)</button>
+
+  <div class="progress-container" id="progressContainer">
+    <div class="progress-bar" id="progressBar"></div>
   </div>
 
-  <button id="startBtn">🚀 Buat Video MP3 & Lirik di Background</button>
-  <button id="downloadBtn" class="download-btn" style="display: none;">💾 Unduh Video MP4 Selesai</button>
-
-  <div class="status-box" id="statusText">Status: Siap memproses video.</div>
+  <div class="status-box" id="statusText">Status: Siap memproses lagu.</div>
+  
+  <textarea id="srtResult" readonly placeholder="Hasil SRT Lirik Utuh akan muncul di sini..."></textarea>
 </div>
 
 <script>
-  // URL SERVER COLAB DARI SCREENSHOT KAMU
-  const COLAB_BACKEND_URL = "https://late-ties-tan.loca.lt"; 
-
-  let currentJobId = null;
-  let checkInterval = null;
-
-  const statusText = document.getElementById('statusText');
+  const CHUNK_DURATION = 180; // Potong per 3 menit (180 detik)
   const startBtn = document.getElementById('startBtn');
-  const downloadBtn = document.getElementById('downloadBtn');
+  const statusText = document.getElementById('statusText');
+  const progressContainer = document.getElementById('progressContainer');
+  const progressBar = document.getElementById('progressBar');
+  const srtResult = document.getElementById('srtResult');
 
-  document.getElementById('startBtn').addEventListener('click', async () => {
-    const audioFile = document.getElementById('audioInput').files[0];
-    const imageFile = document.getElementById('imageInput').files[0];
-
-    if (!audioFile || !imageFile) {
-      return alert("Pilih file Audio MP3 dan Gambar Poster terlebih dahulu!");
-    }
+  startBtn.addEventListener('click', async () => {
+    const file = document.getElementById('audioInput').files[0];
+    if (!file) return alert("Pilih file Audio MP3 terlebih dahulu!");
 
     try {
       startBtn.disabled = true;
-      statusText.innerText = "⏳ Mengunggah MP3 & Gambar ke Server Colab GPU...";
+      progressContainer.style.display = "block";
+      srtResult.style.display = "none";
+      
+      statusText.innerText = "⏳ Menghitung durasi lagu...";
+      
+      // Load Audio via Web Audio API
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      
+      const totalDuration = audioBuffer.duration;
+      const totalChunks = Math.ceil(totalDuration / CHUNK_DURATION);
+      
+      let fullSrt = "";
 
-      const formData = new FormData();
-      formData.append('audio', audioFile);
-      formData.append('image', imageFile);
+      for (let i = 0; i < totalChunks; i++) {
+        const startSec = i * CHUNK_DURATION;
+        const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
+        
+        const progressPercent = Math.round(((i) / totalChunks) * 100);
+        progressBar.style.width = `${progressPercent}%`;
+        statusText.innerText = `🔄 Memproses Bagian ${i + 1} dari ${totalChunks} (${Math.round(startSec/60)}m - ${Math.round(endSec/60)}m)...`;
 
-      const res = await fetch(`${COLAB_BACKEND_URL}/generate-video`, {
-        method: 'POST',
-        headers: {
-          'Bypass-Tunnel-Remainder': 'true'
-        },
-        body: formData
-      });
+        // Slice Audio Buffer
+        const chunkBuffer = sliceAudioBuffer(audioBuffer, startSec, endSec, audioCtx);
+        const chunkBlob = await audioBufferToWavBlob(chunkBuffer);
+        const base64Audio = await blobToBase64(chunkBlob);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Gagal menghubungi server Colab");
+        // Kirim potongan ke Vercel Serverless Function
+        const res = await fetch('/api/transcribe-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioBase64: base64Audio.split(',')[1],
+            mimeType: 'audio/wav',
+            offsetSeconds: Math.floor(startSec)
+          })
+        });
 
-      currentJobId = data.job_id;
-      statusText.innerText = "🚀 Pemrosesan dimulai! Whisper AI sedang mengekstrak lirik. Kamu bebas menutup tab ini sekarang.";
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
 
-      checkInterval = setInterval(checkStatus, 5000);
+        fullSrt += (data.srt || "") + "\n\n";
+      }
+
+      progressBar.style.width = "100%";
+      statusText.innerText = "🎉 Sukses 100%! Lirik dari awal sampai akhir berhasil diekstrak tanpa kepotong.";
+      srtResult.value = fullSrt.trim();
+      srtResult.style.display = "block";
 
     } catch (err) {
       console.error(err);
       statusText.innerText = "❌ Error: " + err.message;
+    } finally {
       startBtn.disabled = false;
     }
   });
 
-  async function checkStatus() {
-    if (!currentJobId) return;
+  // Helper Pemotong Audio Buffer di Browser
+  function sliceAudioBuffer(buffer, startSec, endSec, ctx) {
+    const sampleRate = buffer.sampleRate;
+    const startFrame = Math.floor(startSec * sampleRate);
+    const endFrame = Math.floor(endSec * sampleRate);
+    const frameCount = endFrame - startFrame;
 
-    try {
-      const res = await fetch(`${COLAB_BACKEND_URL}/status/${currentJobId}`, {
-        headers: { 'Bypass-Tunnel-Remainder': 'true' }
-      });
-      const data = await res.json();
-
-      statusText.innerText = `🔄 [Status Server]: ${data.message}`;
-
-      if (data.status === 'completed') {
-        clearInterval(checkInterval);
-        statusText.innerText = "🎉 Video selesai diproses 100%! Klik tombol di bawah untuk mengunduh.";
-        downloadBtn.style.display = "block";
-        downloadBtn.onclick = () => {
-          window.location.href = `${COLAB_BACKEND_URL}${data.download_url}`;
-        };
-      } else if (data.status === 'failed') {
-        clearInterval(checkInterval);
-        startBtn.disabled = false;
+    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, frameCount, sampleRate);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const channelData = buffer.getChannelData(c);
+      const newChannelData = newBuffer.getChannelData(c);
+      for (let i = 0; i < frameCount; i++) {
+        newChannelData[i] = channelData[startFrame + i];
       }
-    } catch (e) {
-      console.error("Gagal cek status:", e);
     }
+    return newBuffer;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Encoder WAV Sederhana
+  function audioBufferToWavBlob(buffer) {
+    const numOfChan = buffer.numberOfChannels,
+      length = buffer.length * numOfChan * 2 + 44,
+      out = new DataView(new ArrayBuffer(length)),
+      channels = [],
+      sampleRate = buffer.sampleRate;
+    let sample, offset = 0, pos = 0;
+
+    function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+    function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+    setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+    setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+    setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
+    setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164);
+    setUint32(length - pos - 4);
+
+    for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+    while (offset < buffer.length) {
+      for (let i = 0; i < numOfChan; i++) {
+        sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+        out.setInt16(pos, sample, true); pos += 2;
+      }
+      offset++;
+    }
+    return new Blob([out], { type: 'audio/wav' });
   }
 </script>
 
