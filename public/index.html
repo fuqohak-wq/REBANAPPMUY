@@ -86,7 +86,7 @@
 
 <div class="container">
   <h1>🌿 AI Music Video Creator</h1>
-  <p class="subtitle">Gemini Chunking Engine + Realtime Video Renderer</p>
+  <p class="subtitle">Gemini Chunking Engine + Universal Video Renderer</p>
 
   <div class="form-group">
     <label for="audioInput">🎵 1. Upload File Audio MP3:</label>
@@ -138,7 +138,6 @@
 </div>
 
 <script>
-  // DIBUAT PER 60 DETIK AGAR UKURAN FILE RINGAN (< 1 MB) DAN TIDAK MENGENAI LIMIT VERCEL
   const CHUNK_DURATION = 60; 
 
   const labelLebar = document.getElementById('labelLebar');
@@ -165,6 +164,7 @@
   let srtSubtitles = [];
   let mediaRecorder = null;
   let recordedChunks = [];
+  let selectedMimeType = 'video/mp4';
 
   startBtn.addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
@@ -188,7 +188,7 @@
       progressContainer.style.display = "block";
       previewArea.style.display = "block";
 
-      statusText.innerText = "⏳ Memotongi audio & kompresi untuk Gemini API...";
+      statusText.innerText = "⏳ Memotong audio & mengekstrak lirik presisi...";
       
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
@@ -203,9 +203,8 @@
         const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
         
         progressBar.style.width = `${Math.round((i / totalChunks) * 50)}%`;
-        statusText.innerText = `🔄 Gemini mengekstrak lirik bagian ${i + 1} dari ${totalChunks}...`;
+        statusText.innerText = `🔄 Gemini membaca lirik bagian ${i + 1} dari ${totalChunks}...`;
 
-        // Slice & Downsample ke 16kHz Mono (Super Ringan)
         const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
         const base64Audio = await blobToBase64(chunkBlob);
 
@@ -234,8 +233,7 @@
       srtSubtitles = parseSRT(rawSrtText);
       progressBar.style.width = "60%";
 
-      // Memulai Pemutaran & Perekaman
-      statusText.innerText = "🎥 Memuat animasi video...";
+      statusText.innerText = "🎥 Memulai pemutaran & perekaman MP4...";
       initParticles(selectedEffect, canvas.width, canvas.height);
 
       const audioEl = new Audio(URL.createObjectURL(audioFile));
@@ -248,10 +246,10 @@
         videoEl.onloadedmetadata = () => {
           videoEl.play();
           audioEl.play();
-          setupRecorder(audioEl);
+          setupRecorderWithAudio(audioEl);
           startAnimationLoop(videoEl, 'video', selectedEffect, audioEl);
           progressBar.style.width = "100%";
-          statusText.innerText = "🎉 Video sedang diputar & direkam ke MP4...";
+          statusText.innerText = "🎉 Video sedang merekam ke MP4... Mohon tunggu lagu selesai.";
         };
       } else {
         const imgEl = new Image();
@@ -259,10 +257,10 @@
         
         imgEl.onload = () => {
           audioEl.play();
-          setupRecorder(audioEl);
+          setupRecorderWithAudio(audioEl);
           startAnimationLoop(imgEl, 'image', selectedEffect, audioEl);
           progressBar.style.width = "100%";
-          statusText.innerText = "🎉 Video sedang diputar & direkam ke MP4...";
+          statusText.innerText = "🎉 Video sedang merekam ke MP4... Mohon tunggu lagu selesai.";
         };
       }
 
@@ -273,7 +271,6 @@
     }
   });
 
-  // Renderer Loop Canvas
   function startAnimationLoop(mediaEl, type, effect, audioEl) {
     function render() {
       ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
@@ -307,24 +304,56 @@
     render();
   }
 
-  function setupRecorder(audioEl) {
+  // FUNGSI PEREKAM VIDEO + AUDIO YANG DIJAMIN DIPUTAR DI SEMUA PEMUTAR
+  function setupRecorderWithAudio(audioEl) {
     recordedChunks = [];
-    const stream = canvas.captureStream(30);
+    
+    // Tangkap video stream dari canvas
+    const canvasStream = canvas.captureStream(30);
 
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    // Tangkap audio stream dari pemutar audio HTML5
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaElementSource(audioEl);
+    const dest = audioCtx.createMediaStreamDestination();
+    source.connect(dest);
+    source.connect(audioCtx.destination); // Tetap perdengarkan ke speaker
+
+    // Gabungkan Stream Video + Audio
+    const combinedStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks()
+    ]);
+
+    // Opsi Codec MP4 Universal
+    const types = [
+      'video/mp4;codecs=h264,aac',
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm'
+    ];
+
+    selectedMimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+
+    mediaRecorder = new MediaRecorder(combinedStream, { mimeType: selectedMimeType });
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+
     mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(recordedChunks, { type: selectedMimeType });
       const videoUrl = URL.createObjectURL(blob);
       
       downloadBtn.style.display = "block";
+      downloadBtn.innerText = `💾 Unduh Hasil Video (${ext.toUpperCase()})`;
       downloadBtn.onclick = () => {
         const a = document.createElement('a');
         a.href = videoUrl;
-        a.download = "music_video_lyric.mp4";
+        a.download = `music_video_lyric.${ext}`;
         a.click();
       };
-      statusText.innerText = "🎉 Selesai 100%! Klik tombol di bawah untuk mengunduh video MP4.";
+      statusText.innerText = "🎉 Selesai 100%! Video beserta Audio & Lirik berhasil direkam. Klik tombol di atas untuk mengunduh.";
       startBtn.disabled = false;
     };
 
@@ -350,7 +379,6 @@
     return items;
   }
 
-  // FUNGSI KHUSUS DOWNSAMPLE AUDIO KE 16000HZ MONO (SUPER COMPRESSED)
   async function sliceAndCompressAudio(buffer, startSec, endSec) {
     const targetSampleRate = 16000;
     const duration = endSec - startSec;
