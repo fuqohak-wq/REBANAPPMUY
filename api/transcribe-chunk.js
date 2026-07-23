@@ -1,7 +1,7 @@
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '25mb', // Diperbesar agar muat MP3 lagu utuh
     },
   },
 };
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { audioBase64, mimeType, offsetSeconds, providedLyrics } = req.body;
+  const { audioBase64, mimeType, providedLyrics } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -32,27 +32,20 @@ export default async function handler(req, res) {
 
     let selectedModel = availableModels.find(m => m.includes('flash')) || availableModels[0];
 
-    // PROMPT DENGAN DUKUNGAN LIRIK MANUAL DARI USER
-    let prompt = `Kamu adalah pencocok waktu lirik (Lyric Timestamper) yang sangat presisi.
-Dengarkan potongan audio ini yang dimulai pada detik ke-${offsetSeconds}.
+    const prompt = `Kamu adalah pencocok timestamp lirik lagu yang sangat presisi (Audio-to-Text Alignment Expert).
 
-`;
+Dengarkan audio lagu berikut DARI AWAL SAMPAI AKHIR.
 
-    if (providedLyrics && providedLyrics.trim() !== '') {
-      prompt += `BERIKUT ADALAH TEKS LIRIK PATOKAN UTAMA:
+LIRIK PATOKAN UTAMA:
 """
-${providedLyrics}
+${providedLyrics || ''}
 """
 
 TUGAS UTAMA:
-Gunakan teks lirik di atas. Dengarkan audio dan tentukan TIMESTAMP (mulai dan selesai) untuk baris lirik yang dinyanyikan pada potongan audio ini!
-SEMUA timestamp SRT HARUS disesuaikan dan ditambahkan offset detik ke-${offsetSeconds}.
-PENTING: Jangan ubah/tambah kata pada lirik patokan di atas, hanya cocokkan timestamp-nya saja ke format SRT!`;
-    } else {
-      prompt += `Ekstrak lirik dari audio potongan ini ke format SRT. Semua timestamp SRT HARUS ditambah offset detik ke-${offsetSeconds}.`;
-    }
-
-    prompt += `\n\nKeluaran HARUS HANYA berupa teks format SRT yang valid. Tanpa pembuka/penutup markdown.`;
+1. Cocokkan baris-baris lirik di atas dengan audio dari detik 00:00:00 hingga akhir lagu.
+2. Buat output format SRT yang SANGAT PRESISI.
+3. Pastikan urutan lirik BERURUTAN dari awal lagu sampai akhir. JANGAN PERNAH melompati lirik atau menukar urutan baris lirik.
+4. Jangan tambahkan kata-kata pembuka/penutup markdown. Cukup keluarkan teks format SRT yang valid saja.`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -63,7 +56,7 @@ PENTING: Jangan ubah/tambah kata pada lirik patokan di atas, hanya cocokkan time
             { text: prompt },
             {
               inlineData: {
-                mimeType: mimeType || 'audio/wav',
+                mimeType: mimeType || 'audio/mp3',
                 data: audioBase64
               }
             }
