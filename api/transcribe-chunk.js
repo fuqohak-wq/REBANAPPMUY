@@ -18,8 +18,11 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Vercel!' });
   }
 
-  try {
-    const prompt = `Kamu adalah sistem Speech-to-Text yang sangat presisi. 
+  // Daftar nama model Gemini Flash yang valid
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-flash'];
+  let lastError = null;
+
+  const prompt = `Kamu adalah sistem Speech-to-Text yang sangat presisi. 
 Dengarkan audio potongan lagu berikut dan ekstrak liriknya beserta timestamp dalam format SRT.
 
 PETUNJUK WAKTU SANGAT PENTING:
@@ -29,34 +32,39 @@ Contoh: Jika vokal terdengar di detik ke-5 pada potongan ini, maka timestamp SRT
 
 Keluaran HARUS HANYA berupa teks format SRT yang valid (urutan, timestamp, teks lirik). Jangan tambahkan teks pembuka/penutup markdown.`;
 
-    // UPDATE: Menggunakan model gemini-2.5-flash
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType || 'audio/wav',
-                data: audioBase64
+  for (const modelName of modelsToTry) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType || 'audio/wav',
+                  data: audioBase64
+                }
               }
-            }
-          ]
-        }]
-      })
-    });
+            ]
+          }]
+        })
+      });
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error?.message || 'Gagal memproses dengan Gemini 2.5 Flash');
+      const data = await response.json();
+
+      if (response.ok) {
+        const srtText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return res.status(200).json({ srt: srtText });
+      }
+
+      lastError = data.error?.message || `Error pada model ${modelName}`;
+    } catch (err) {
+      lastError = err.message;
     }
-
-    const srtText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return res.status(200).json({ srt: srtText });
-
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
   }
+
+  // Jika semua model gagal
+  return res.status(500).json({ error: `Gagal memproses audio. Log error: ${lastError}` });
 }
