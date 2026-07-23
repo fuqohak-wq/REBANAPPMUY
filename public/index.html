@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Music Video Creator (Secure MP4/WEBM)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --success-hover: #059669;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+      --border: #334155;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .container {
+      max-width: 850px;
+      width: 100%;
+      background: var(--card);
+      padding: 28px;
+      border-radius: 20px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5);
+      border: 1px solid var(--border);
+    }
+    h1 {
+      text-align: center;
+      color: #818cf8;
+      margin: 0 0 8px 0;
+      font-size: 1.8rem;
+    }
+    p.subtitle {
+      text-align: center;
+      color: var(--subtext);
+      margin-top: 0;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .grid-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .grid-form { grid-template-columns: 1fr; }
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #cbd5e1;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0f172a;
+      color: var(--text);
+      box-sizing: border-box;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      background: #312e81;
+      color: #a5b4fc;
+      margin-left: 6px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    button {
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    button:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; opacity: 0.7; }
+    button.download-btn { background: var(--success); }
+    button.download-btn:hover:not(:disabled) { background: var(--success-hover); }
+
+    .preview-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 24px;
+      background: #090d16;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+    }
+    canvas {
+      background: #000;
+      border-radius: 8px;
+      max-width: 100%;
+      height: auto;
+      max-height: 480px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+    }
+    .status-box {
+      margin-top: 12px;
+      padding: 10px 16px;
+      background: #1e293b;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      color: #38bdf8;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
+      border-left: 4px solid #38bdf8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🎬 AI Music Video Creator</h1>
+  <p class="subtitle">Otomatisasi Lirik dengan Gemini 2.5 Flash (Aman & Siap MP4)</p>
+
+  <div class="grid-form">
+    <div class="form-group">
+      <label for="audioInput">1. File Audio MP3:</label>
+      <input type="file" id="audioInput" accept="audio/mp3, audio/wav, audio/m4a">
+    </div>
+
+    <div class="form-group">
+      <label for="imageInput">2. Foto Pendukung (Multi-select):</label>
+      <input type="file" id="imageInput" accept="image/*" multiple>
+    </div>
+
+    <div class="form-group">
+      <label for="aspectRatio">3. Format / Ukuran Video:</label>
+      <select id="aspectRatio">
+        <option value="16:9">Memanjang / Landscape 16:9 (YouTube Video / TV)</option>
+        <option value="9:16">Meninggi / Portrait 9:16 (YouTube Shorts / Reels / TikTok)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="videoFormat">4. Format Output Download: <span class="badge" id="codecBadge">Auto Detect</span></label>
+      <select id="videoFormat"></select>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button id="processBtn">✨ 1. Analisis Lirik & Timestamp via AI</button>
+    <button id="renderBtn" disabled>▶️ 2. Putar & Rekam Video Canvas</button>
+    <button id="downloadBtn" class="download-btn" disabled>💾 3. Unduh Video Siap Upload</button>
+  </div>
+
+  <div class="status-box" id="statusText">Status: Silakan pilih file MP3 dan Foto Anda.</div>
+
+  <div class="preview-zone">
+    <canvas id="videoCanvas"></canvas>
+  </div>
+</div>
+
+<script>
+  let audioBuffer = null;
+  let audioContext = null;
+  let audioSource = null;
+  let analyser = null;
+  let lyricsData = [];
+  let userImages = [];
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let selectedMimeType = '';
+
+  const canvas = document.getElementById('videoCanvas');
+  const ctx = canvas.getContext('2d');
+  const statusText = document.getElementById('statusText');
+  const formatSelect = document.getElementById('videoFormat');
+  const codecBadge = document.getElementById('codecBadge');
+
+  // Deteksi Format yang Didukung Browser
+  function detectSupportedFormats() {
+    formatSelect.innerHTML = '';
+    const formats = [
+      { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4', label: 'MP4 (H.264 / AAC) - Siap Sosmed' },
+      { mime: 'video/mp4;codecs=vp9,mp4a.40.2', ext: 'mp4', label: 'MP4 (VP9 / AAC) - Standar Baru MP4' },
+      { mime: 'video/mp4', ext: 'mp4', label: 'MP4 Video Standard' },
+      { mime: 'video/webm;codecs=vp9,opus', ext: 'webm', label: 'WEBM (VP9 / Opus) - Sangat Jernih' },
+      { mime: 'video/webm', ext: 'webm', label: 'WEBM Standard' }
+    ];
+
+    let supportedList = [];
+    formats.forEach(item => {
+      if (MediaRecorder.isTypeSupported(item.mime)) {
+        supportedList.push(item);
+        const opt = document.createElement('option');
+        opt.value = item.mime;
+        opt.dataset.ext = item.ext;
+        opt.textContent = item.label;
+        formatSelect.appendChild(opt);
+      }
+    });
+
+    if (supportedList.length > 0) {
+      selectedMimeType = supportedList[0].mime;
+      codecBadge.textContent = supportedList[0].ext.toUpperCase() + ' Ready';
+    } else {
+      codecBadge.textContent = 'Fallback';
+    }
+  }
+
+  detectSupportedFormats();
+
+  formatSelect.addEventListener('change', (e) => {
+    selectedMimeType = e.target.value;
+    const selectedOpt = e.target.options[e.target.selectedIndex];
+    codecBadge.textContent = selectedOpt.dataset.ext.toUpperCase();
+  });
+
+  function updateCanvasDimensions() {
+    const ratio = document.getElementById('aspectRatio').value;
+    if (ratio === '16:9') {
+      canvas.width = 1280;
+      canvas.height = 720;
+    } else {
+      canvas.width = 720;
+      canvas.height = 1280;
+    }
+  }
+  document.getElementById('aspectRatio').addEventListener('change', updateCanvasDimensions);
+  updateCanvasDimensions();
+
+  document.getElementById('imageInput').addEventListener('change', (e) => {
+    userImages = [];
+    for (let file of e.target.files) {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      userImages.push(img);
+    }
+  });
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // 1. Panggil Vercel Serverless Function (/api/analyze)
+  document.getElementById('processBtn').addEventListener('click', async () => {
+    const audioFile = document.getElementById('audioInput').files[0];
+
+    if (!audioFile) {
+      alert("Mohon sertakan file audio MP3!");
+      return;
+    }
+
+    statusText.innerText = "⏳ Sedang memproses audio dengan Gemini 2.5 Flash di Backend Vercel...";
+
+    try {
+      const base64Audio = await fileToBase64(audioFile);
+
+      // Memanggil Serverless Backend (API Key tersembunyi dengan aman di server)
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64Audio: base64Audio,
+          mimeType: audioFile.type || 'audio/mp3'
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Terjadi kesalahan sistem.');
+      }
+
+      let rawText = data.candidates[0].content.parts[0].text;
+      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      lyricsData = JSON.parse(rawText);
+
+      statusText.innerText = `✅ Berhasil! Gemini mendeteksi ${lyricsData.length} baris lirik. Siap untuk diputar & direkam.`;
+      document.getElementById('renderBtn').disabled = false;
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await audioFile.arrayBuffer();
+      audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    } catch (err) {
+      console.error(err);
+      statusText.innerText = "❌ Gagal memproses: " + err.message;
+    }
+  });
+
+  // 2. Loop Render Frame (Ken Burns + Audio Wave + Lyric)
+  let startTime = 0;
+  let isPlaying = false;
+
+  function renderFrame() {
+    if (!isPlaying) return;
+
+    const currentTime = audioContext.currentTime - startTime;
+    const duration = audioBuffer.duration;
+
+    if (currentTime > duration) {
+      isPlaying = false;
+      statusText.innerText = "🎉 Selesai merekam video! Klik tombol 'Unduh Video' di bawah.";
+      document.getElementById('downloadBtn').disabled = false;
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+      return;
+    }
+
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (userImages.length > 0) {
+      const imgIndex = Math.floor(currentTime / 4) % userImages.length;
+      const img = userImages[imgIndex];
+      if (img.complete) {
+        const progress = (currentTime % 4) / 4;
+        const scale = 1 + (progress * 0.08);
+        
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(scale, scale);
+        ctx.globalAlpha = 0.65;
+        ctx.drawImage(img, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+        ctx.restore();
+      }
+    }
+
+    if (analyser) {
+      const freqData = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(freqData);
+
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.4)';
+      const barWidth = (canvas.width / freqData.length) * 2;
+      let x = 0;
+      for (let i = 0; i < freqData.length; i++) {
+        const barHeight = (freqData[i] / 255) * (canvas.height * 0.22);
+        ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+        x += barWidth;
+      }
+    }
+
+    const currentLyric = lyricsData.find(l => currentTime >= l.start && currentTime <= l.end);
+    if (currentLyric) {
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#6366f1';
+      ctx.shadowBlur = 16;
+      ctx.font = `bold ${canvas.width * 0.048}px sans-serif`;
+      ctx.textAlign = 'center';
+      
+      ctx.fillText(currentLyric.text, canvas.width / 2, canvas.height * 0.75);
+    }
+
+    requestAnimationFrame(renderFrame);
+  }
+
+  // 3. Rekam Video Realtime
+  document.getElementById('renderBtn').addEventListener('click', () => {
+    if (!audioBuffer) return;
+
+    audioSource = audioContext.createBufferSource();
+    audioSource.buffer = audioBuffer;
+
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 128;
+
+    const dest = audioContext.createMediaStreamDestination();
+    audioSource.connect(analyser);
+    analyser.connect(audioContext.destination);
+    analyser.connect(dest);
+
+    const canvasStream = canvas.captureStream(30);
+    const combinedStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks()
+    ]);
+
+    recordedChunks = [];
+    const options = selectedMimeType ? { mimeType: selectedMimeType } : {};
+    
+    try {
+      mediaRecorder = new MediaRecorder(combinedStream, options);
+    } catch (e) {
+      mediaRecorder = new MediaRecorder(combinedStream);
+    }
+
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+
+    mediaRecorder.start();
+    audioSource.start(0);
+    startTime = audioContext.currentTime;
+    isPlaying = true;
+
+    statusText.innerText = "⏺️ Merekam video secara realtime... Biarkan lagu berputar hingga selesai.";
+    renderFrame();
+  });
+
+  // 4. Download File Video
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const selectedOpt = formatSelect.options[formatSelect.selectedIndex];
+    const ext = selectedOpt ? selectedOpt.dataset.ext : 'mp4';
+    const mime = mediaRecorder.mimeType || 'video/mp4';
+
+    const blob = new Blob(recordedChunks, { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `music-video-${document.getElementById('aspectRatio').value.replace(':','-')}.${ext}`;
+    a.click();
+  });
+</script>
+
+</body>
+</html>
