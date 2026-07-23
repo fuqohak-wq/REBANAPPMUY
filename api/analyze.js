@@ -1,11 +1,3 @@
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Menaikkan limit internal jika menggunakan plan Vercel Pro/Custom
-    },
-  },
-};
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -43,7 +35,7 @@ export default async function handler(req, res) {
     const responseText = await response.text();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: `Gemini Error (${response.status}): ${responseText}` });
+      return res.status(response.status).json({ error: `Gemini Error: ${responseText}` });
     }
 
     const data = JSON.parse(responseText);
