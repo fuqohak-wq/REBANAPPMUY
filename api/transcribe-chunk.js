@@ -1,21 +1,23 @@
 export default async function handler(req, res) {
-  // Hanya izinkan method POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { audioBase64, mimeType, offsetSeconds, duration, chunkLyrics } = req.body;
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Vercel Environment Variables!' });
-  }
-
   try {
-    const endSec = offsetSeconds + duration;
+    const { audioBase64, mimeType, offsetSeconds, duration, chunkLyrics } = req.body || {};
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // Prompt Dibuat Sangat Ketat & Jelas
-    const prompt = `Kamu adalah pencocok timestamp lirik audio yang sangat presisi.
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Vercel Environment Variables!' });
+    }
+
+    if (!audioBase64) {
+      return res.status(400).json({ error: 'Data audio tidak ditemukan dalam request!' });
+    }
+
+    const endSec = (offsetSeconds || 0) + (duration || 0);
+
+    const prompt = `Kamu adalah pencocok timestamp lirik audio yang presisi.
 
 Dengarkan potongan audio ini (detik ${offsetSeconds} sampai ${endSec} dari lagu utama).
 
@@ -27,16 +29,13 @@ ${chunkLyrics || ''}
 TUGAS:
 1. Tentukan timestamp mulai dan selesai untuk lirik di atas yang terdengar di potongan audio ini.
 2. Tambahkan offset ${offsetSeconds} detik pada setiap timestamp SRT agar sesuai waktu lagu utama.
-3. HANYA keluarkan format SRT murni tanpa kata pembuka/penutup atau tag markdown (```srt).`;
+3. HANYA keluarkan format SRT murni tanpa kata pembuka/penutup atau tag markdown.`;
 
-    // Tembak LANGSUNG ke model gemini-1.5-flash tanpa meminta list models dulu
-    const targetUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKey}`;
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json' 
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [
@@ -55,19 +54,17 @@ TUGAS:
     const data = await response.json();
 
     if (!response.ok) {
-      // Tangkap pesan error detail dari Google jika ada
-      const googleError = data.error?.message || JSON.stringify(data.error) || 'Gagal merespon dari Google API';
-      throw new Error(`Google API Error (${response.status}): ${googleError}`);
+      const googleErr = data.error?.message || 'Gagal merespon dari Google API';
+      return res.status(response.status).json({ error: `Google API Error: ${googleErr}` });
     }
 
     const srtText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    // Bersihkan jika Gemini tidak sengaja memberi wrapper markdown ```srt
     const cleanedSrt = srtText.replace(/```srt/g, '').replace(/```/g, '').trim();
 
     return res.status(200).json({ srt: cleanedSrt });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('Server Crash Error:', err);
+    return res.status(500).json({ error: `Internal Server Error: ${err.message}` });
   }
 }
