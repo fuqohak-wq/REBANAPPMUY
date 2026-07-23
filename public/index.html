@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Bypass Vercel Payload Limit)</title>
+  <title>AI Music Video Creator (Gemini File API - Unlimited MP3 Size)</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -61,7 +61,7 @@
 
 <div class="container">
   <h1>🎬 AI Music Video Creator</h1>
-  <p class="subtitle">Otomatisasi Lirik Gemini 2.5 Flash (Ultra-Light Audio Compression)</p>
+  <p class="subtitle">Direct Gemini File API Upload (Fast, Accurate & Auto-Cleanup)</p>
 
   <div class="grid-form">
     <div class="form-group">
@@ -88,11 +88,11 @@
     </div>
   </div>
 
-  <button id="processBtn">✨ 1. Kompres Audio & Analisis AI</button>
+  <button id="processBtn">✨ 1. Analisis Lirik via File API</button>
   <button id="renderBtn" disabled>▶️ 2. Putar & Rekam Video Canvas</button>
   <button id="downloadBtn" class="download-btn" disabled>💾 3. Unduh Video Siap Upload</button>
 
-  <div class="status-box" id="statusText">Status: Pilih file audio MP3 Anda.</div>
+  <div class="status-box" id="statusText">Status: Silakan pilih file audio MP3 Anda.</div>
 
   <div class="preview-zone">
     <canvas id="videoCanvas"></canvas>
@@ -108,7 +108,6 @@
   let userImages = [];
   let mediaRecorder = null;
   let recordedChunks = [];
-  let selectedMimeType = '';
 
   const canvas = document.getElementById('videoCanvas');
   const ctx = canvas.getContext('2d');
@@ -120,7 +119,7 @@
     const formats = [
       { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4', label: 'MP4 (Siap Sosmed)' },
       { mime: 'video/mp4', ext: 'mp4', label: 'MP4 Standard' },
-      { mime: 'video/webm;codecs=vp9,opus', ext: 'webm', label: 'WEBM (Sangat Jernih)' },
+      { mime: 'video/webm;codecs=vp9,opus', ext: 'webm', label: 'WEBM (Jernih)' },
       { mime: 'video/webm', ext: 'webm', label: 'WEBM Standard' }
     ];
 
@@ -133,7 +132,6 @@
         formatSelect.appendChild(opt);
       }
     });
-    if (formatSelect.options.length > 0) selectedMimeType = formatSelect.value;
   }
   detectSupportedFormats();
 
@@ -154,100 +152,69 @@
     }
   });
 
-  // Kompres Audio Super Ringan Khusus Pengiriman ke Gemini AI (12kHz Mono WAV)
-  async function compressAudioForGemini(audioBuffer) {
-    const targetSampleRate = 12000;
-    const offlineCtx = new OfflineAudioContext(1, Math.ceil(audioBuffer.duration * targetSampleRate), targetSampleRate);
-    const source = offlineCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(offlineCtx.destination);
-    source.start();
-
-    const renderedBuffer = await offlineCtx.startRendering();
-    
-    // Konversi float channel data ke 8-bit PCM (Menghemat ukuran hingga 75%)
-    const channelData = renderedBuffer.getChannelData(0);
-    const bufferLength = channelData.length;
-    const wavHeaderBuffer = new ArrayBuffer(44 + bufferLength);
-    const view = new DataView(wavHeaderBuffer);
-
-    function writeString(offset, string) {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    }
-
-    writeString(0, 'RIFF');
-    view.setUint32(4, 36 + bufferLength, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM
-    view.setUint16(22, 1, true); // Mono
-    view.setUint32(24, targetSampleRate, true);
-    view.setUint32(28, targetSampleRate, true); // Byte rate
-    view.setUint16(32, 1, true); // Block align
-    view.setUint16(34, 8, true); // 8-bit
-    writeString(36, 'data');
-    view.setUint32(40, bufferLength, true);
-
-    // Convert float -1.0 .. 1.0 to uint8 0 .. 255
-    let offset = 44;
-    for (let i = 0; i < bufferLength; i++) {
-      let s = Math.max(-1, Math.min(1, channelData[i]));
-      view.setUint8(offset++, (s + 1) * 127.5);
-    }
-
-    const wavBlob = new Blob([view], { type: 'audio/wav' });
-
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result.split(',')[1]);
-      reader.readAsDataURL(wavBlob);
-    });
-  }
-
-  // Process Click
+  // Proses Utama Analisis Audio
   document.getElementById('processBtn').addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
-    if (!audioFile) return alert("Pilih file audio terlebih dahulu!");
-
-    statusText.innerText = "⚡ 1/2 Mengompres ukuran audio agar muat di server Vercel...";
+    if (!audioFile) return alert("Pilih file audio MP3 terlebih dahulu!");
 
     try {
+      // 1. Dapatkan Resumable Upload URL dari Backend Vercel
+      statusText.innerText = "⚡ 1/4 Mempersiapkan Upload Session...";
+      const initRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'getUploadUrl',
+          mimeType: audioFile.type || 'audio/mp3',
+          size: audioFile.size
+        })
+      });
+
+      const initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error || 'Gagal menyiapkan URL Upload');
+
+      // 2. Unggah File MP3 LANGSUNG dari Browser ke Google (Melompati limit 4.5MB Vercel)
+      statusText.innerText = "🚀 2/4 Mengunggah audio langsung ke Google Server...";
+      const uploadRes = await fetch(initData.uploadUrl, {
+        method: 'POST',
+        headers: {
+          'X-Goog-Upload-Offset': '0',
+          'X-Goog-Upload-Command': 'upload, finalize'
+        },
+        body: audioFile
+      });
+
+      const uploadData = await uploadRes.json();
+      const fileUri = uploadData.file.uri;
+      const fileName = uploadData.file.name; // ID file rahasia di Google Storage
+
+      // 3. Minta Backend Menganalisis Lirik & Menghapus File Seketika
+      statusText.innerText = "⏳ 3/4 Gemini 2.5 Flash sedang mengekstrak lirik & timestamp...";
+      const analyzeRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'analyzeAndDelete',
+          mimeType: audioFile.type || 'audio/mp3',
+          fileUri: fileUri,
+          fileName: fileName
+        })
+      });
+
+      const analyzeData = await analyzeRes.json();
+      if (!analyzeRes.ok) throw new Error(analyzeData.error || 'Gagal analisis lirik');
+
+      let rawText = analyzeData.candidates[0].content.parts[0].text;
+      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      lyricsData = JSON.parse(rawText);
+
+      // 4. Load Audio Local untuk Playback Realtime
+      statusText.innerText = "🔊 4/4 Memuat Audio player lokal...";
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
       rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      // Kompres audio secara otomatis
-      const base64LightAudio = await compressAudioForGemini(rawAudioBuffer);
-
-      statusText.innerText = "⏳ 2/2 Memproses lirik dengan Gemini 2.5 Flash...";
-
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base64Audio: base64LightAudio,
-          mimeType: 'audio/wav'
-        })
-      });
-
-      const textRes = await response.text();
-      let data;
-      try {
-        data = JSON.parse(textRes);
-      } catch (e) {
-        throw new Error("Pesan dari Server: " + textRes);
-      }
-
-      if (!response.ok) throw new Error(data.error || 'Gagal merespon dari server');
-
-      let rawText = data.candidates[0].content.parts[0].text;
-      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      lyricsData = JSON.parse(rawText);
-
-      statusText.innerText = `✅ Berhasil! Ditemukan ${lyricsData.length} baris lirik. Siap diputar & direkam.`;
+      statusText.innerText = `✅ Berhasil! ${lyricsData.length} baris lirik terdeteksi. File sementara di Google telah dibersihkan. Siap Diputar!`;
       document.getElementById('renderBtn').disabled = false;
 
     } catch (err) {
@@ -316,7 +283,7 @@
     requestAnimationFrame(renderFrame);
   }
 
-  // Start Play & Record
+  // Play & Record
   document.getElementById('renderBtn').addEventListener('click', () => {
     if (!rawAudioBuffer) return;
 
