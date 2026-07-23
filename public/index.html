@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Gemini File API - Unlimited MP3 Size)</title>
+  <title>AI Music Video Creator (No-CORS & Fast)</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -61,7 +61,7 @@
 
 <div class="container">
   <h1>🎬 AI Music Video Creator</h1>
-  <p class="subtitle">Direct Gemini File API Upload (Fast, Accurate & Auto-Cleanup)</p>
+  <p class="subtitle">Otomatisasi Lirik dengan Gemini 2.5 Flash</p>
 
   <div class="grid-form">
     <div class="form-group">
@@ -88,7 +88,7 @@
     </div>
   </div>
 
-  <button id="processBtn">✨ 1. Analisis Lirik via File API</button>
+  <button id="processBtn">✨ 1. Analisis Lirik via AI</button>
   <button id="renderBtn" disabled>▶️ 2. Putar & Rekam Video Canvas</button>
   <button id="downloadBtn" class="download-btn" disabled>💾 3. Unduh Video Siap Upload</button>
 
@@ -152,52 +152,76 @@
     }
   });
 
+  // Kompresi Audio Cerdas di Browser (Mengecilkan file MP3 menjadi ~1MB tanpa merusak vokal)
+  async function compressAudioForAI(audioBuffer) {
+    const sampleRate = 16000; // 16kHz Mono ideal untuk vokal AI
+    const offlineCtx = new OfflineAudioContext(1, Math.ceil(audioBuffer.duration * sampleRate), sampleRate);
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineCtx.destination);
+    source.start(0);
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    const channelData = renderedBuffer.getChannelData(0);
+    const bufferLength = channelData.length;
+    
+    const wavHeaderBuffer = new ArrayBuffer(44 + bufferLength * 2);
+    const view = new DataView(wavHeaderBuffer);
+
+    function writeString(offset, string) {
+      for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + bufferLength * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true); // 16-bit
+    writeString(36, 'data');
+    view.setUint32(40, bufferLength * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < bufferLength; i++) {
+      let s = Math.max(-1, Math.min(1, channelData[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+
+    const wavBlob = new Blob([view], { type: 'audio/wav' });
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.readAsDataURL(wavBlob);
+    });
+  }
+
   // Proses Utama Analisis Audio
   document.getElementById('processBtn').addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
     if (!audioFile) return alert("Pilih file audio MP3 terlebih dahulu!");
 
     try {
-      // 1. Dapatkan Resumable Upload URL dari Backend Vercel
-      statusText.innerText = "⚡ 1/4 Mempersiapkan Upload Session...";
-      const initRes = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'getUploadUrl',
-          mimeType: audioFile.type || 'audio/mp3',
-          size: audioFile.size
-        })
-      });
+      statusText.innerText = "⚡ 1/3 Mengompresi audio di browser secara lokal...";
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await audioFile.arrayBuffer();
+      rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      const initData = await initRes.json();
-      if (!initRes.ok) throw new Error(initData.error || 'Gagal menyiapkan URL Upload');
+      // Kompres audio menjadi file super ringan
+      const compressedBase64 = await compressAudioForAI(rawAudioBuffer);
 
-      // 2. Unggah File MP3 LANGSUNG dari Browser ke Google (Melompati limit 4.5MB Vercel)
-      statusText.innerText = "🚀 2/4 Mengunggah audio langsung ke Google Server...";
-      const uploadRes = await fetch(initData.uploadUrl, {
-        method: 'POST',
-        headers: {
-          'X-Goog-Upload-Offset': '0',
-          'X-Goog-Upload-Command': 'upload, finalize'
-        },
-        body: audioFile
-      });
-
-      const uploadData = await uploadRes.json();
-      const fileUri = uploadData.file.uri;
-      const fileName = uploadData.file.name; // ID file rahasia di Google Storage
-
-      // 3. Minta Backend Menganalisis Lirik & Menghapus File Seketika
-      statusText.innerText = "⏳ 3/4 Gemini 2.5 Flash sedang mengekstrak lirik & timestamp...";
+      statusText.innerText = "⏳ 2/3 Mengirim data ke Gemini 2.5 Flash via Vercel Backend...";
       const analyzeRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'analyzeAndDelete',
-          mimeType: audioFile.type || 'audio/mp3',
-          fileUri: fileUri,
-          fileName: fileName
+          base64Audio: compressedBase64,
+          mimeType: 'audio/wav'
         })
       });
 
@@ -208,13 +232,7 @@
       rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
       lyricsData = JSON.parse(rawText);
 
-      // 4. Load Audio Local untuk Playback Realtime
-      statusText.innerText = "🔊 4/4 Memuat Audio player lokal...";
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const arrayBuffer = await audioFile.arrayBuffer();
-      rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-      statusText.innerText = `✅ Berhasil! ${lyricsData.length} baris lirik terdeteksi. File sementara di Google telah dibersihkan. Siap Diputar!`;
+      statusText.innerText = `✅ Berhasil! ${lyricsData.length} baris lirik terdeteksi. Siap Diputar & Direkam!`;
       document.getElementById('renderBtn').disabled = false;
 
     } catch (err) {
