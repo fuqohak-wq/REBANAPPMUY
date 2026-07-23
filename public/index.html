@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Fix Payload 413)</title>
+  <title>AI Music Video Creator (Bypass Vercel Payload Limit)</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -61,7 +61,7 @@
 
 <div class="container">
   <h1>🎬 AI Music Video Creator</h1>
-  <p class="subtitle">Otomatisasi Lirik Gemini 2.5 Flash (Auto Audio Compressor Enabled)</p>
+  <p class="subtitle">Otomatisasi Lirik Gemini 2.5 Flash (Ultra-Light Audio Compression)</p>
 
   <div class="grid-form">
     <div class="form-group">
@@ -88,7 +88,7 @@
     </div>
   </div>
 
-  <button id="processBtn">✨ 1. Kompres & Analisis Lirik via AI</button>
+  <button id="processBtn">✨ 1. Kompres Audio & Analisis AI</button>
   <button id="renderBtn" disabled>▶️ 2. Putar & Rekam Video Canvas</button>
   <button id="downloadBtn" class="download-btn" disabled>💾 3. Unduh Video Siap Upload</button>
 
@@ -154,17 +154,52 @@
     }
   });
 
-  // Function Mengompres Audio menjadi ringan (Mono 16kHz WAV) khusus untuk dikirim ke Gemini AI
+  // Kompres Audio Super Ringan Khusus Pengiriman ke Gemini AI (12kHz Mono WAV)
   async function compressAudioForGemini(audioBuffer) {
-    const offlineCtx = new OfflineAudioContext(1, audioBuffer.duration * 16000, 16000);
+    const targetSampleRate = 12000;
+    const offlineCtx = new OfflineAudioContext(1, Math.ceil(audioBuffer.duration * targetSampleRate), targetSampleRate);
     const source = offlineCtx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(offlineCtx.destination);
     source.start();
 
     const renderedBuffer = await offlineCtx.startRendering();
-    const wavBlob = bufferToWavBlob(renderedBuffer);
     
+    // Konversi float channel data ke 8-bit PCM (Menghemat ukuran hingga 75%)
+    const channelData = renderedBuffer.getChannelData(0);
+    const bufferLength = channelData.length;
+    const wavHeaderBuffer = new ArrayBuffer(44 + bufferLength);
+    const view = new DataView(wavHeaderBuffer);
+
+    function writeString(offset, string) {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + bufferLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, targetSampleRate, true);
+    view.setUint32(28, targetSampleRate, true); // Byte rate
+    view.setUint16(32, 1, true); // Block align
+    view.setUint16(34, 8, true); // 8-bit
+    writeString(36, 'data');
+    view.setUint32(40, bufferLength, true);
+
+    // Convert float -1.0 .. 1.0 to uint8 0 .. 255
+    let offset = 44;
+    for (let i = 0; i < bufferLength; i++) {
+      let s = Math.max(-1, Math.min(1, channelData[i]));
+      view.setUint8(offset++, (s + 1) * 127.5);
+    }
+
+    const wavBlob = new Blob([view], { type: 'audio/wav' });
+
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result.split(',')[1]);
@@ -172,49 +207,22 @@
     });
   }
 
-  function bufferToWavBlob(buffer) {
-    const numOfChan = buffer.numberOfChannels,
-          length = buffer.length * numOfChan * 2 + 44,
-          out = new DataView(new ArrayBuffer(length)),
-          channels = [], sampleRate = buffer.sampleRate;
-    let offset = 44, pos = 0;
-
-    function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
-    function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
-
-    setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
-    setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
-    setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
-    setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
-
-    for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
-    while (pos < length) {
-      for (let i = 0; i < numOfChan; i++) {
-        let sample = Math.max(-1, Math.min(1, channels[i][offset]));
-        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-        out.setInt16(pos, sample, true); pos += 2;
-      }
-      offset++;
-    }
-    return new Blob([out], { type: 'audio/wav' });
-  }
-
   // Process Click
   document.getElementById('processBtn').addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
     if (!audioFile) return alert("Pilih file audio terlebih dahulu!");
 
-    statusText.innerText = "⚡ 1/2 Membaca & Mengompres Audio agar muat dikirim...";
+    statusText.innerText = "⚡ 1/2 Mengompres ukuran audio agar muat di server Vercel...";
 
     try {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
       rawAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      // Kompres audio secara otomatis di browser
+      // Kompres audio secara otomatis
       const base64LightAudio = await compressAudioForGemini(rawAudioBuffer);
 
-      statusText.innerText = "⏳ 2/2 Mengirim ke Gemini 2.5 Flash via Serverless Vercel...";
+      statusText.innerText = "⏳ 2/2 Memproses lirik dengan Gemini 2.5 Flash...";
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -230,10 +238,10 @@
       try {
         data = JSON.parse(textRes);
       } catch (e) {
-        throw new Error("Respon Server Bukan JSON: " + textRes.substring(0, 100));
+        throw new Error("Pesan dari Server: " + textRes);
       }
 
-      if (!response.ok) throw new Error(data.error || 'Gagal berkomunikasi dengan AI');
+      if (!response.ok) throw new Error(data.error || 'Gagal merespon dari server');
 
       let rawText = data.candidates[0].content.parts[0].text;
       rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -313,7 +321,7 @@
     if (!rawAudioBuffer) return;
 
     audioSource = audioContext.createBufferSource();
-    audioSource.buffer = rawAudioBuffer; // Memakai Kualitas Asli Jernih untuk Hasil Output Video
+    audioSource.buffer = rawAudioBuffer;
 
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 128;
