@@ -23,20 +23,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Download buffer MP3 dari Cloudinary untuk dikirim ke Gemini
+    // 1. Download buffer MP3 dari Cloudinary
     const audioFetch = await fetch(audioUrl);
     const audioArrayBuffer = await audioFetch.arrayBuffer();
     const base64Audio = Buffer.from(audioArrayBuffer).toString('base64');
 
-    const prompt = `Analisis file audio lagu ini dan ekstraksi liriknya. Output WAJIB JSON murni (array dari objek) tanpa teks markdown tambahan. 
-    Skema JSON wajib:
-    [
-      {"start": 0.0, "end": 4.5, "text": "Lirik baris pertama"},
-      {"start": 4.5, "end": 8.0, "text": "Lirik baris kedua"}
-    ]
-    Penting: Wajib beri stempel waktu/timestamp detik (start dan end) yang presisi sesuai ucapan vokal lagu.`;
+    // 2. Prompt Gemini 2.5 Flash diperketat agar timestamp akurat sampai akhir lagu
+    const prompt = `Analisis file audio lagu ini secara teliti dan buatkan lirik beserta timestamp waktu (dalam detik) yang SANGAT PRESISI.
 
-    // 2. Kirim ke Gemini 2.5 Flash
+    Aturan Wajib:
+    1. Bagi lirik menjadi baris-baris pendek (3 sampai 6 kata per baris).
+    2. Tentukan waktu awal ("start") dan waktu akhir ("end") sesuai ketukan vokal dengan ketelitian desimal (contoh: 12.4).
+    3. PENTING: Jaga akurasi pergeseran waktu dari detik awal (0.0s) sampai detik PALING AKHIR lagu. Jangan biarkan timestamp melompat atau tertinggal.
+    4. Output WAJIB JSON murni berupa array of objects tanpa pembuka/penutup markdown.
+    
+    Skema JSON:
+    [
+      {"start": 0.0, "end": 4.2, "text": "Mari belajar ilmu tauhid mulia"},
+      {"start": 4.5, "end": 8.1, "text": "Mengenal Allah Rabb semesta raya"}
+    ]`;
+
+    // 3. Kirim ke Gemini API
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -52,10 +59,9 @@ export default async function handler(req, res) {
 
     const data = await geminiRes.json();
 
-    // 3. LANGSUNG HAPUS FILE DARI CLOUDINARY (Auto Cleanup agar storage 0 Byte)
+    // 4. BEBAS MEMORI: Hapus file MP3 di Cloudinary seketika
     try {
-      await cloudinary.uploader.destroy(publicId, { resource_type: 'video' }); 
-      // Catatan: Cloudinary mengkategorikan file MP3/Audio di bawah resource_type 'video'
+      await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
     } catch (cleanErr) {
       console.error("Gagal hapus file Cloudinary:", cleanErr);
     }
@@ -67,7 +73,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (error) {
-    // Cleanup cadangan jika ada error
     if (publicId) {
       await cloudinary.uploader.destroy(publicId, { resource_type: 'video' }).catch(() => {});
     }
