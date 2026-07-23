@@ -138,7 +138,9 @@
 </div>
 
 <script>
-  const CHUNK_DURATION = 180; // 3 menit per potongan untuk Gemini API
+  // DIBUAT PER 60 DETIK AGAR UKURAN FILE RINGAN (< 1 MB) DAN TIDAK MENGENAI LIMIT VERCEL
+  const CHUNK_DURATION = 60; 
+
   const labelLebar = document.getElementById('labelLebar');
   const labelTegak = document.getElementById('labelTegak');
   const radioInputs = document.querySelectorAll('input[name="aspectRatio"]');
@@ -186,8 +188,7 @@
       progressContainer.style.display = "block";
       previewArea.style.display = "block";
 
-      // LANGKAH 1: Gemini Auto-Chunking Lirik
-      statusText.innerText = "⏳ Memotong audio & memproses lirik ke Gemini API...";
+      statusText.innerText = "⏳ Memotongi audio & kompresi untuk Gemini API...";
       
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
@@ -202,10 +203,10 @@
         const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
         
         progressBar.style.width = `${Math.round((i / totalChunks) * 50)}%`;
-        statusText.innerText = `🔄 Gemini membaca lirik bagian ${i + 1} dari ${totalChunks}...`;
+        statusText.innerText = `🔄 Gemini mengekstrak lirik bagian ${i + 1} dari ${totalChunks}...`;
 
-        const chunkBuffer = sliceAudioBuffer(audioBuffer, startSec, endSec, audioCtx);
-        const chunkBlob = await audioBufferToWavBlob(chunkBuffer);
+        // Slice & Downsample ke 16kHz Mono (Super Ringan)
+        const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
         const base64Audio = await blobToBase64(chunkBlob);
 
         const res = await fetch('/api/transcribe-chunk', {
@@ -218,17 +219,23 @@
           })
         });
 
-        const data = await res.json();
-        if (res.ok) {
-          rawSrtText += (data.srt || "") + "\n\n";
+        const responseText = await res.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Server Error: ${responseText.substring(0, 100)}...`);
         }
+
+        if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
+        rawSrtText += (data.srt || "") + "\n\n";
       }
 
       srtSubtitles = parseSRT(rawSrtText);
       progressBar.style.width = "60%";
 
-      // LANGKAH 2: Render Video + Efek + Lirik
-      statusText.innerText = "🎥 Memuat elemen animasi video...";
+      // Memulai Pemutaran & Perekaman
+      statusText.innerText = "🎥 Memuat animasi video...";
       initParticles(selectedEffect, canvas.width, canvas.height);
 
       const audioEl = new Audio(URL.createObjectURL(audioFile));
@@ -266,13 +273,12 @@
     }
   });
 
-  // Renderer Loop Canvas (Lirik + Background + Efek)
+  // Renderer Loop Canvas
   function startAnimationLoop(mediaEl, type, effect, audioEl) {
     function render() {
       ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
       updateAndDrawParticles(effect);
 
-      // Gambar Teks Lirik Sesuai Detik Audio
       const currentTime = audioEl.currentTime;
       const currentLyric = srtSubtitles.find(sub => currentTime >= sub.start && currentTime <= sub.end);
 
@@ -281,12 +287,10 @@
         ctx.font = "bold 32px 'Segoe UI', sans-serif";
         ctx.textAlign = "center";
         
-        // Background hitam transparan teks
         const textWidth = ctx.measureText(currentLyric.text).width;
         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
         ctx.fillRect(canvas.width / 2 - textWidth / 2 - 15, canvas.height - 130, textWidth + 30, 50);
 
-        // Teks Lirik Putih
         ctx.fillStyle = "#ffffff";
         ctx.fillText(currentLyric.text, canvas.width / 2, canvas.height - 95);
         ctx.restore();
@@ -303,7 +307,6 @@
     render();
   }
 
-  // Perekam Video Canvas Ke MP4 File
   function setupRecorder(audioEl) {
     recordedChunks = [];
     const stream = canvas.captureStream(30);
@@ -328,7 +331,6 @@
     mediaRecorder.start();
   }
 
-  // Parser SRT Lirik Ke Array Detik
   function parseSRT(srtText) {
     const items = [];
     const blocks = srtText.trim().split(/\n\s*\n/);
@@ -348,22 +350,19 @@
     return items;
   }
 
-  // Helper Pemotong Audio Buffer
-  function sliceAudioBuffer(buffer, startSec, endSec, ctx) {
-    const sampleRate = buffer.sampleRate;
-    const startFrame = Math.floor(startSec * sampleRate);
-    const endFrame = Math.floor(endSec * sampleRate);
-    const frameCount = endFrame - startFrame;
+  // FUNGSI KHUSUS DOWNSAMPLE AUDIO KE 16000HZ MONO (SUPER COMPRESSED)
+  async function sliceAndCompressAudio(buffer, startSec, endSec) {
+    const targetSampleRate = 16000;
+    const duration = endSec - startSec;
+    const offlineCtx = new OfflineAudioContext(1, duration * targetSampleRate, targetSampleRate);
 
-    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, frameCount, sampleRate);
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const channelData = buffer.getChannelData(c);
-      const newChannelData = newBuffer.getChannelData(c);
-      for (let i = 0; i < frameCount; i++) {
-        newChannelData[i] = channelData[startFrame + i];
-      }
-    }
-    return newBuffer;
+    const source = offlineCtx.createBufferSource();
+    source.buffer = buffer;
+    source.start(0, startSec, duration);
+    source.connect(offlineCtx.destination);
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    return audioBufferToWavBlob(renderedBuffer);
   }
 
   function blobToBase64(blob) {
@@ -404,7 +403,6 @@
     return new Blob([out], { type: 'audio/wav' });
   }
 
-  // Partikel Hujan/Api/Bintang
   function initParticles(effect, w, h) {
     particles = [];
     const count = effect === 'rain' ? 150 : 60;
