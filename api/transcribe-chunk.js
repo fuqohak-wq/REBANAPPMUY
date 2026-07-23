@@ -1,17 +1,9 @@
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '25mb', // Diperbesar agar muat MP3 lagu utuh
-    },
-  },
-};
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { audioBase64, mimeType, providedLyrics } = req.body;
+  const { audioBase64, mimeType, offsetSeconds, duration, chunkLyrics } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -32,20 +24,23 @@ export default async function handler(req, res) {
 
     let selectedModel = availableModels.find(m => m.includes('flash')) || availableModels[0];
 
-    const prompt = `Kamu adalah pencocok timestamp lirik lagu yang sangat presisi (Audio-to-Text Alignment Expert).
+    const endSec = offsetSeconds + duration;
 
-Dengarkan audio lagu berikut DARI AWAL SAMPAI AKHIR.
+    // PROMPT DENGAN PEMBATASAN LIRIK SEKUENSIL DARI BROWSER
+    const prompt = `Kamu adalah pencocok timestamp lirik (Audio-Lyric Aligner) yang sangat presisi.
 
-LIRIK PATOKAN UTAMA:
+Dengarkan potongan audio ini yang diambil dari detik ke-${offsetSeconds} sampai detik ke-${endSec} dari lagu utama.
+
+LIRIK KHUSUS POTONGAN AUDIO INI:
 """
-${providedLyrics || ''}
+${chunkLyrics || ''}
 """
 
 TUGAS UTAMA:
-1. Cocokkan baris-baris lirik di atas dengan audio dari detik 00:00:00 hingga akhir lagu.
-2. Buat output format SRT yang SANGAT PRESISI.
-3. Pastikan urutan lirik BERURUTAN dari awal lagu sampai akhir. JANGAN PERNAH melompati lirik atau menukar urutan baris lirik.
-4. Jangan tambahkan kata-kata pembuka/penutup markdown. Cukup keluarkan teks format SRT yang valid saja.`;
+1. Dengarkan vokal dalam audio dan tentukan timestamp mulai dan selesai untuk baris-baris lirik di atas.
+2. SEMUA timestamp SRT WAJIB ditambahkan offset awal yaitu ${offsetSeconds} detik (sehingga timestamp mencerminkan posisi di lagu utama).
+3. HANYA keluarkan baris lirik yang BENAR-BENAR TERDENGAR dinyanyikan pada rentang waktu detik ${offsetSeconds}s - ${endSec}s ini.
+4. Keluarkan HANYA teks format SRT yang valid tanpa pembuka/penutup markdown. Jika tidak ada vokal sama sekali, kembalikan teks kosong.`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -56,7 +51,7 @@ TUGAS UTAMA:
             { text: prompt },
             {
               inlineData: {
-                mimeType: mimeType || 'audio/mp3',
+                mimeType: mimeType || 'audio/wav',
                 data: audioBase64
               }
             }
