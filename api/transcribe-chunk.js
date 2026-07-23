@@ -31,7 +31,7 @@ TUGAS:
 2. Tambahkan offset ${offsetSeconds} detik pada setiap timestamp SRT agar sesuai waktu lagu utama.
 3. HANYA keluarkan format SRT murni tanpa kata pembuka/penutup atau tag markdown.`;
 
-    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(targetUrl, {
       method: 'POST',
