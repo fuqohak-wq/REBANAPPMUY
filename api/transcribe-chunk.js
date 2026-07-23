@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Vercel Environment Variables!' });
+      return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Environment Variables!' });
     }
 
     if (!audioBase64) {
@@ -27,11 +27,22 @@ ${chunkLyrics || ''}
 """
 
 TUGAS:
-1. Tentukan timestamp mulai dan selesai untuk lirik di atas yang terdengar di potongan audio ini.
-2. Tambahkan offset ${offsetSeconds} detik pada setiap timestamp SRT agar sesuai waktu lagu utama.
-3. HANYA keluarkan format SRT murni tanpa kata pembuka/penutup atau tag markdown.`;
+Cocokkan baris-baris lirik di atas dengan audio yang didengar. 
+Tentukan waktu mulai (start) dan selesai (end) dalam satuan detik untuk setiap baris lirik. 
+Tambahkan offset waktu sebesar ${offsetSeconds} detik pada hasil akhir agar sinkron dengan lagu utama.
 
-    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+Hasilkan keluaran berupa JSON dengan struktur berikut:
+{
+  "subtitles": [
+    {
+      "start": 0.0,
+      "end": 0.0,
+      "text": "Teks lirik"
+    }
+  ]
+}`;
+
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(targetUrl, {
       method: 'POST',
@@ -47,7 +58,10 @@ TUGAS:
               }
             }
           ]
-        }]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
       })
     });
 
@@ -58,10 +72,15 @@ TUGAS:
       return res.status(response.status).json({ error: `Google API Error: ${googleErr}` });
     }
 
-    const srtText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleanedSrt = srtText.replace(/```srt/g, '').replace(/```/g, '').trim();
+    const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(jsonText);
+    } catch (e) {
+      return res.status(500).json({ error: 'Gagal membaca format JSON dari AI', raw: jsonText });
+    }
 
-    return res.status(200).json({ srt: cleanedSrt });
+    return res.status(200).json(parsedResult);
 
   } catch (err) {
     console.error('Server Crash Error:', err);
