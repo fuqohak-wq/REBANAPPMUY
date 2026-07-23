@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Smart Sequential Slicer)</title>
+  <title>AI Music Video Creator (Lightweight Slicer)</title>
   <style>
     :root {
       --bg: #f0fdf4;
@@ -89,7 +89,7 @@
 
 <div class="container">
   <h1>🌿 AI Music Video Creator</h1>
-  <p class="subtitle">Smart Sequential Precision Engine</p>
+  <p class="subtitle">Smart Ultra-Light Precision Engine</p>
 
   <div class="form-group">
     <label for="audioInput">🎵 1. Upload File Audio MP3:</label>
@@ -146,7 +146,8 @@
 </div>
 
 <script>
-  const CHUNK_DURATION = 45; // Chunk audio 45 detik agar ringan (~1MB)
+  // POTONG MENJADI CHUNK 25 DETIK AGAR UKURAN FILE SANGAT KECIL (<800KB)
+  const CHUNK_DURATION = 25; 
 
   const labelLebar = document.getElementById('labelLebar');
   const labelTegak = document.getElementById('labelTegak');
@@ -210,11 +211,10 @@
       const totalDuration = audioBuffer.duration;
       const totalChunks = Math.ceil(totalDuration / CHUNK_DURATION);
 
-      // PECAH TEKS LIRIK DENGAN RAPI MENJADI ARRAY PER BARIS
       const lyricLines = rawLyricsText
         .split('\n')
         .map(l => l.trim())
-        .filter(l => l.length > 0 && !l.startsWith('[')); // Hapus baris kosong & tag [Chorus]/[Intro]
+        .filter(l => l.length > 0 && !l.startsWith('['));
 
       const linesPerChunk = Math.ceil(lyricLines.length / totalChunks);
       let rawSrtText = "";
@@ -224,12 +224,11 @@
         const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
         const actualDuration = endSec - startSec;
         
-        // POTONG TEKS LIRIK HANYA UNTUK BAGIAN CHUNK INI (SEKUENSIL)
         const chunkLyricLines = lyricLines.slice(i * linesPerChunk, (i + 1) * linesPerChunk);
         const chunkLyricsText = chunkLyricLines.join('\n');
 
         progressBar.style.width = `${Math.round(((i + 1) / totalChunks) * 50)}%`;
-        statusText.innerText = `🔄 Gemini menyelaraskan lirik bagian ${i + 1} dari ${totalChunks} (Detik ${Math.floor(startSec)}s - ${Math.floor(endSec)}s)...`;
+        statusText.innerText = `🔄 Gemini memproses bagian ${i + 1} dari ${totalChunks} (${Math.floor(startSec)}s - ${Math.floor(endSec)}s)...`;
 
         const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
         const base64Audio = await blobToBase64(chunkBlob);
@@ -242,7 +241,7 @@
             mimeType: 'audio/wav',
             offsetSeconds: Math.floor(startSec),
             duration: Math.floor(actualDuration),
-            chunkLyrics: chunkLyricsText // Hanya kirim potongan lirik sekuensil!
+            chunkLyrics: chunkLyricsText
           })
         });
 
@@ -251,7 +250,7 @@
         try {
           data = JSON.parse(responseText);
         } catch (e) {
-          throw new Error(`Server Error: ${responseText.substring(0, 100)}...`);
+          throw new Error(`Response Server bukan JSON: ${responseText.substring(0, 150)}`);
         }
 
         if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
@@ -344,7 +343,6 @@
 
   function setupRecorderWithAudio(audioEl) {
     recordedChunks = [];
-    
     const canvasStream = canvas.captureStream(30);
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -412,10 +410,11 @@
     return items;
   }
 
+  // KOMPRESI ULTRA RINGAN (8kHz MONO) -> UKURAN FILE CHUNK HANYA ~400KB!
   async function sliceAndCompressAudio(buffer, startSec, endSec) {
-    const targetSampleRate = 16000; // Kompresi mono 16kHz agar super ringan (~1MB)
+    const targetSampleRate = 8000; 
     const duration = endSec - startSec;
-    const offlineCtx = new OfflineAudioContext(1, duration * targetSampleRate, targetSampleRate);
+    const offlineCtx = new OfflineAudioContext(1, Math.floor(duration * targetSampleRate), targetSampleRate);
 
     const source = offlineCtx.createBufferSource();
     source.buffer = buffer;
