@@ -3,189 +3,376 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Gemini Auto-Chunking)</title>
+  <title>AI Music Video Creator (Fresh Leaf Edition)</title>
   <style>
     :root {
-      --bg: #0f172a; --card: #1e293b; --accent: #6366f1;
-      --accent-hover: #4f46e5; --text: #f8fafc; --subtext: #94a3b8; --border: #334155;
+      --bg: #f0fdf4;            /* Hijau daun sangat muda */
+      --card: #ffffff;          /* Kartu putih bersih */
+      --accent: #16a34a;        /* Hijau daun segar */
+      --accent-hover: #15803d;  /* Hijau daun gelap */
+      --text: #0f172a;          /* Teks gelap scannable */
+      --subtext: #475569;       /* Subteks abu-abu netral */
+      --border: #bbf7d0;        /* Border hijau muda */
+      --shadow: 0 10px 25px -5px rgba(22, 163, 74, 0.15);
     }
+
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background-color: var(--bg); color: var(--text);
-      margin: 0; padding: 24px 16px; display: flex; flex-direction: column; align-items: center;
-      min-height: 100vh; box-sizing: border-box;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
     }
+
     .container {
-      max-width: 650px; width: 100%; background: var(--card); padding: 28px;
-      border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); border: 1px solid var(--border);
+      max-width: 680px;
+      width: 100%;
+      background: var(--card);
+      padding: 32px;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
     }
-    h1 { text-align: center; color: #818cf8; margin: 0 0 8px 0; font-size: 1.8rem; }
-    p.subtitle { text-align: center; color: var(--subtext); margin-top: 0; margin-bottom: 24px; font-size: 0.95rem; }
-    .form-group { margin-bottom: 16px; }
-    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; color: #cbd5e1; }
-    input, button {
-      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
-      background: #0f172a; color: var(--text); box-sizing: border-box; font-size: 0.95rem; outline: none;
+
+    h1 {
+      text-align: center;
+      color: #15803d;
+      margin: 0 0 8px 0;
+      font-size: 1.8rem;
     }
-    button { background: var(--accent); color: white; font-weight: 600; border: none; cursor: pointer; margin-top: 10px; }
+
+    p.subtitle {
+      text-align: center;
+      color: var(--subtext);
+      margin-top: 0;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+
+    .form-group { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #1e293b;
+    }
+
+    input[type="file"], select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: var(--text);
+      box-sizing: border-box;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    input[type="file"]:focus, select:focus {
+      border-color: var(--accent);
+      background: #ffffff;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .radio-card {
+      flex: 1;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8fafc;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .radio-card input { display: none; }
+
+    .radio-card.active {
+      border-color: var(--accent);
+      background: #dcfce7;
+      color: #14532d;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 10px;
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+      transition: background 0.2s;
+    }
+
     button:hover:not(:disabled) { background: var(--accent-hover); }
-    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
-    .progress-container { width: 100%; background-color: #0f172a; border-radius: 10px; height: 12px; margin-top: 15px; overflow: hidden; display: none; }
+    button:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; }
+
+    .progress-container {
+      width: 100%;
+      background-color: #e2e8f0;
+      border-radius: 10px;
+      height: 12px;
+      margin-top: 15px;
+      overflow: hidden;
+      display: none;
+    }
+
     .progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s; }
-    .status-box { margin-top: 15px; padding: 12px; background: #0f172a; border-radius: 10px; font-size: 0.85rem; color: #38bdf8; text-align: center; border-left: 4px solid #38bdf8; }
-    textarea { width: 100%; height: 180px; background: #0f172a; color: #a5f3fc; border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-top: 15px; font-family: monospace; box-sizing: border-box; display: none; }
+
+    .status-box {
+      margin-top: 15px;
+      padding: 12px;
+      background: #f0fdf4;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: #166534;
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+
+    .preview-area {
+      margin-top: 24px;
+      text-align: center;
+      display: none;
+    }
+
+    canvas {
+      max-width: 100%;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      background: #000;
+    }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>🎬 AI Music Video Creator</h1>
-  <p class="subtitle">100% Vercel Engine + Gemini Smart Auto-Chunking</p>
+  <h1>🌿 AI Music Video Creator</h1>
+  <p class="subtitle">Desain Hijau Daun Segar + Efek Animasi Realtime</p>
 
+  <!-- 1. UPLOAD AUDIO MP3 -->
   <div class="form-group">
-    <label for="audioInput">1. File Audio MP3 (Bebas 1-2 Jam):</label>
+    <label for="audioInput">🎵 1. Upload File Audio MP3:</label>
     <input type="file" id="audioInput" accept="audio/*">
   </div>
 
-  <button id="startBtn">🚀 Ekstrak Lirik Presisi (Auto-Chunk 3 Menit)</button>
+  <!-- 2. UPLOAD GAMBAR ATAU VIDEO BACKGROUND -->
+  <div class="form-group">
+    <label for="bgInput">🖼️ 2. Upload Gambar / Video Background Asli:</label>
+    <input type="file" id="bgInput" accept="image/*,video/*">
+  </div>
+
+  <!-- 3. PILIHAN FORMAT RENDER (LEBAR / TEGAK) -->
+  <div class="form-group">
+    <label>📐 3. Format Ukuran Video Output:</label>
+    <div class="radio-group">
+      <label class="radio-card active" id="labelLebar">
+        <input type="radio" name="aspectRatio" value="16:9" checked>
+        🖥️ Lebar (16:9)<br><small>YouTube / Desktop</small>
+      </label>
+      <label class="radio-card" id="labelTegak">
+        <input type="radio" name="aspectRatio" value="9:16">
+        📱 Tegak (9:16)<br><small>Shorts / Reels / TikTok</small>
+      </label>
+    </div>
+  </div>
+
+  <!-- 4. PILIHAN EFEK ANIMASI OVERLAY -->
+  <div class="form-group">
+    <label for="effectSelect">✨ 4. Efek Animasi Overlay tambahan:</label>
+    <select id="effectSelect">
+      <option value="none">Tanpa Efek (Polosan)</option>
+      <option value="rain">🌧️ Air Hujan Deras</option>
+      <option value="fire">🔥 Percikan Api Melayang</option>
+      <option value="particles">✨ Partikel Cahaya Bintang</option>
+    </select>
+  </div>
+
+  <button id="startBtn">🚀 Mulaikan Pemrosesan & Render Lirik</button>
 
   <div class="progress-container" id="progressContainer">
     <div class="progress-bar" id="progressBar"></div>
   </div>
 
-  <div class="status-box" id="statusText">Status: Siap memproses lagu.</div>
-  
-  <textarea id="srtResult" readonly placeholder="Hasil SRT Lirik Utuh akan muncul di sini..."></textarea>
+  <div class="status-box" id="statusText">Status: Siap memproses video musik.</div>
+
+  <!-- KANVAS PEMUTAR ANIMASI -->
+  <div class="preview-area" id="previewArea">
+    <h3 style="color:#15803d; margin-bottom:10px;">🎥 Hasil Video Animasi</h3>
+    <canvas id="videoCanvas"></canvas>
+  </div>
 </div>
 
 <script>
-  const CHUNK_DURATION = 180; // Potong per 3 menit (180 detik)
+  // Pilihan Format Ratio
+  const labelLebar = document.getElementById('labelLebar');
+  const labelTegak = document.getElementById('labelTegak');
+  const radioInputs = document.querySelectorAll('input[name="aspectRatio"]');
+
+  radioInputs.forEach(input => {
+    input.addEventListener('change', (e) => {
+      labelLebar.classList.toggle('active', e.target.value === '16:9');
+      labelTegak.classList.toggle('active', e.target.value === '9:16');
+    });
+  });
+
   const startBtn = document.getElementById('startBtn');
   const statusText = document.getElementById('statusText');
   const progressContainer = document.getElementById('progressContainer');
   const progressBar = document.getElementById('progressBar');
-  const srtResult = document.getElementById('srtResult');
+  const previewArea = document.getElementById('previewArea');
+  const canvas = document.getElementById('videoCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let particles = [];
 
   startBtn.addEventListener('click', async () => {
-    const file = document.getElementById('audioInput').files[0];
-    if (!file) return alert("Pilih file Audio MP3 terlebih dahulu!");
+    const audioFile = document.getElementById('audioInput').files[0];
+    const bgFile = document.getElementById('bgInput').files[0];
+    const aspectRatio = document.querySelector('input[name="aspectRatio"]:checked').value;
+    const selectedEffect = document.getElementById('effectSelect').value;
 
-    try {
-      startBtn.disabled = true;
-      progressContainer.style.display = "block";
-      srtResult.style.display = "none";
+    if (!audioFile || !bgFile) {
+      return alert("Upload File Audio MP3 dan Gambar/Video Background terlebih dahulu!");
+    }
+
+    // Tentukan Resolusi Canvas berdasarkan Pilihan YouTube Lebar / Tegak
+    if (aspectRatio === '16:9') {
+      canvas.width = 1280;
+      canvas.height = 720;
+    } else {
+      canvas.width = 720;
+      canvas.height = 1280;
+    }
+
+    startBtn.disabled = true;
+    progressContainer.style.display = "block";
+    previewArea.style.display = "block";
+
+    statusText.innerText = "⏳ Memuat background & efek animasi...";
+    progressBar.style.width = "50%";
+
+    // Inisialisasi Partikel Efek
+    initParticles(selectedEffect, canvas.width, canvas.height);
+
+    // Muat Background (Gambar atau Video)
+    if (bgFile.type.startsWith('video/')) {
+      const videoEl = document.createElement('video');
+      videoEl.src = URL.createObjectURL(bgFile);
+      videoEl.loop = true;
+      videoEl.muted = true;
+      videoEl.play();
       
-      statusText.innerText = "⏳ Menghitung durasi lagu...";
+      videoEl.onloadedmetadata = () => {
+        startAnimationLoop(videoEl, 'video', selectedEffect);
+        progressBar.style.width = "100%";
+        statusText.innerText = "🎉 Video Animasi Siap Diputar!";
+      };
+    } else {
+      const imgEl = new Image();
+      imgEl.src = URL.createObjectURL(bgFile);
       
-      // Load Audio via Web Audio API
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      
-      const totalDuration = audioBuffer.duration;
-      const totalChunks = Math.ceil(totalDuration / CHUNK_DURATION);
-      
-      let fullSrt = "";
-
-      for (let i = 0; i < totalChunks; i++) {
-        const startSec = i * CHUNK_DURATION;
-        const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
-        
-        const progressPercent = Math.round(((i) / totalChunks) * 100);
-        progressBar.style.width = `${progressPercent}%`;
-        statusText.innerText = `🔄 Memproses Bagian ${i + 1} dari ${totalChunks} (${Math.round(startSec/60)}m - ${Math.round(endSec/60)}m)...`;
-
-        // Slice Audio Buffer
-        const chunkBuffer = sliceAudioBuffer(audioBuffer, startSec, endSec, audioCtx);
-        const chunkBlob = await audioBufferToWavBlob(chunkBuffer);
-        const base64Audio = await blobToBase64(chunkBlob);
-
-        // Kirim potongan ke Vercel Serverless Function
-        const res = await fetch('/api/transcribe-chunk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audioBase64: base64Audio.split(',')[1],
-            mimeType: 'audio/wav',
-            offsetSeconds: Math.floor(startSec)
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
-
-        fullSrt += (data.srt || "") + "\n\n";
-      }
-
-      progressBar.style.width = "100%";
-      statusText.innerText = "🎉 Sukses 100%! Lirik dari awal sampai akhir berhasil diekstrak tanpa kepotong.";
-      srtResult.value = fullSrt.trim();
-      srtResult.style.display = "block";
-
-    } catch (err) {
-      console.error(err);
-      statusText.innerText = "❌ Error: " + err.message;
-    } finally {
-      startBtn.disabled = false;
+      imgEl.onload = () => {
+        startAnimationLoop(imgEl, 'image', selectedEffect);
+        progressBar.style.width = "100%";
+        statusText.innerText = "🎉 Video Animasi Siap Diputar!";
+      };
     }
   });
 
-  // Helper Pemotong Audio Buffer di Browser
-  function sliceAudioBuffer(buffer, startSec, endSec, ctx) {
-    const sampleRate = buffer.sampleRate;
-    const startFrame = Math.floor(startSec * sampleRate);
-    const endFrame = Math.floor(endSec * sampleRate);
-    const frameCount = endFrame - startFrame;
-
-    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, frameCount, sampleRate);
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const channelData = buffer.getChannelData(c);
-      const newChannelData = newBuffer.getChannelData(c);
-      for (let i = 0; i < frameCount; i++) {
-        newChannelData[i] = channelData[startFrame + i];
+  // Sistem Animasi Realtime Canvas (Background + Efek Hujan/Api + Lirik)
+  function startAnimationLoop(mediaEl, type, effect) {
+    function render() {
+      // 1. Gambar Background
+      if (type === 'video') {
+        ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
       }
+
+      // 2. Gambar Efek Animasi Overlap
+      updateAndDrawParticles(effect);
+
+      // 3. Request Frame Selanjutnya
+      requestAnimationFrame(render);
     }
-    return newBuffer;
+    render();
   }
 
-  function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+  // Logika Pembuat Partikel (Hujan / Api / Bintang)
+  function initParticles(effect, w, h) {
+    particles = [];
+    const count = effect === 'rain' ? 150 : 60;
+
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        speed: Math.random() * 8 + 4,
+        size: Math.random() * 3 + 1,
+        opacity: Math.random() * 0.8 + 0.2
+      });
+    }
   }
 
-  // Encoder WAV Sederhana
-  function audioBufferToWavBlob(buffer) {
-    const numOfChan = buffer.numberOfChannels,
-      length = buffer.length * numOfChan * 2 + 44,
-      out = new DataView(new ArrayBuffer(length)),
-      channels = [],
-      sampleRate = buffer.sampleRate;
-    let sample, offset = 0, pos = 0;
+  function updateAndDrawParticles(effect) {
+    if (effect === 'none') return;
 
-    function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
-    function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+    ctx.save();
+    for (let p of particles) {
+      if (effect === 'rain') {
+        // Efek Air Hujan
+        ctx.strokeStyle = `rgba(186, 230, 253, ${p.opacity})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - 1, p.y + p.speed * 2);
+        ctx.stroke();
 
-    setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
-    setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
-    setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan);
-    setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164);
-    setUint32(length - pos - 4);
+        p.y += p.speed * 2;
+        if (p.y > canvas.height) p.y = 0;
 
-    for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+      } else if (effect === 'fire') {
+        // Efek Percikan Api Melayang
+        ctx.fillStyle = `rgba(251, 146, 60, ${p.opacity})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
+        ctx.fill();
 
-    while (offset < buffer.length) {
-      for (let i = 0; i < numOfChan; i++) {
-        sample = Math.max(-1, Math.min(1, channels[i][offset]));
-        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-        out.setInt16(pos, sample, true); pos += 2;
+        p.y -= p.speed * 0.5; // Api naik ke atas
+        p.x += (Math.random() - 0.5) * 2;
+        if (p.y < 0) p.y = canvas.height;
+
+      } else if (effect === 'particles') {
+        // Efek Partikel Cahaya
+        ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        p.y -= p.speed * 0.2;
+        if (p.y < 0) p.y = canvas.height;
       }
-      offset++;
     }
-    return new Blob([out], { type: 'audio/wav' });
+    ctx.restore();
   }
 </script>
 
