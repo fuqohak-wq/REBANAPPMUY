@@ -29,7 +29,7 @@ Contoh: Jika vokal terdengar di detik ke-5 pada potongan ini, maka timestamp SRT
 
 Keluaran HARUS HANYA berupa teks format SRT yang valid (urutan, timestamp, teks lirik). Jangan tambahkan teks pembuka/penutup markdown.`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
