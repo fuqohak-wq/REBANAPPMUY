@@ -1,7 +1,7 @@
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb', // Cukup untuk potongan audio 3 menit
+      sizeLimit: '10mb',
     },
   },
 };
@@ -29,6 +29,7 @@ Contoh: Jika vokal terdengar di detik ke-5 pada potongan ini, maka timestamp SRT
 
 Keluaran HARUS HANYA berupa teks format SRT yang valid (urutan, timestamp, teks lirik). Jangan tambahkan teks pembuka/penutup markdown.`;
 
+    // UPDATE: Menggunakan model gemini-2.5-flash
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -38,7 +39,7 @@ Keluaran HARUS HANYA berupa teks format SRT yang valid (urutan, timestamp, teks 
             { text: prompt },
             {
               inlineData: {
-                mimeType: mimeType || 'audio/mp3',
+                mimeType: mimeType || 'audio/wav',
                 data: audioBase64
               }
             }
@@ -49,7 +50,7 @@ Keluaran HARUS HANYA berupa teks format SRT yang valid (urutan, timestamp, teks 
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Gagal memproses dengan Gemini');
+      throw new Error(data.error?.message || 'Gagal memproses dengan Gemini 2.5 Flash');
     }
 
     const srtText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
