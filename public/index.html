@@ -45,10 +45,13 @@
     .form-group { margin-bottom: 18px; }
     label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; color: #1e293b; }
 
-    input[type="file"], select {
+    input[type="file"], select, textarea {
       width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #cbd5e1;
       background: #f8fafc; color: var(--text); box-sizing: border-box; font-size: 0.95rem; outline: none;
+      font-family: inherit;
     }
+
+    textarea { height: 120px; resize: vertical; }
 
     .radio-group { display: flex; gap: 12px; }
     .radio-card {
@@ -86,7 +89,7 @@
 
 <div class="container">
   <h1>🌿 AI Music Video Creator</h1>
-  <p class="subtitle">Gemini Chunking Engine + Universal Video Renderer</p>
+  <p class="subtitle">Smart Alignment Engine + Universal Renderer</p>
 
   <div class="form-group">
     <label for="audioInput">🎵 1. Upload File Audio MP3:</label>
@@ -98,8 +101,14 @@
     <input type="file" id="bgInput" accept="image/*,video/*">
   </div>
 
+  <!-- MENU INPUT LIRIK TEKS MANUAL -->
   <div class="form-group">
-    <label>📐 3. Format Ukuran Video Output:</label>
+    <label for="lyricsInput">📝 3. Tempel Lirik Teks Asli (Opsional, Agar 100% Presisi):</label>
+    <textarea id="lyricsInput" placeholder="Tempel seluruh lirik lagu di sini per baris... AI akan bertugas mencocokkan detiknya secara presisi!"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>📐 4. Format Ukuran Video Output:</label>
     <div class="radio-group">
       <label class="radio-card active" id="labelLebar">
         <input type="radio" name="aspectRatio" value="16:9" checked>
@@ -113,7 +122,7 @@
   </div>
 
   <div class="form-group">
-    <label for="effectSelect">✨ 4. Efek Animasi Overlay tambahan:</label>
+    <label for="effectSelect">✨ 5. Efek Animasi Overlay tambahan:</label>
     <select id="effectSelect">
       <option value="none">Tanpa Efek (Polosan)</option>
       <option value="rain">🌧️ Air Hujan Deras</option>
@@ -169,6 +178,7 @@
   startBtn.addEventListener('click', async () => {
     const audioFile = document.getElementById('audioInput').files[0];
     const bgFile = document.getElementById('bgInput').files[0];
+    const userLyrics = document.getElementById('lyricsInput').value;
     const aspectRatio = document.querySelector('input[name="aspectRatio"]:checked').value;
     const selectedEffect = document.getElementById('effectSelect').value;
 
@@ -188,7 +198,7 @@
       progressContainer.style.display = "block";
       previewArea.style.display = "block";
 
-      statusText.innerText = "⏳ Memotong audio & mengekstrak lirik presisi...";
+      statusText.innerText = "⏳ Memotong audio & mencocokkan timestamp lirik...";
       
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
@@ -203,7 +213,7 @@
         const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
         
         progressBar.style.width = `${Math.round((i / totalChunks) * 50)}%`;
-        statusText.innerText = `🔄 Gemini membaca lirik bagian ${i + 1} dari ${totalChunks}...`;
+        statusText.innerText = `🔄 Gemini mencocokkan lirik bagian ${i + 1} dari ${totalChunks}...`;
 
         const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
         const base64Audio = await blobToBase64(chunkBlob);
@@ -214,7 +224,8 @@
           body: JSON.stringify({
             audioBase64: base64Audio.split(',')[1],
             mimeType: 'audio/wav',
-            offsetSeconds: Math.floor(startSec)
+            offsetSeconds: Math.floor(startSec),
+            providedLyrics: userLyrics
           })
         });
 
@@ -231,7 +242,6 @@
       }
 
       srtSubtitles = parseSRT(rawSrtText);
-      console.log("Subtitles Loaded:", srtSubtitles);
       progressBar.style.width = "60%";
 
       statusText.innerText = "🎥 Memulai pemutaran & perekaman MP4...";
@@ -272,16 +282,11 @@
     }
   });
 
-  // LOOPING RENDERER DENGAN URUTAN LAYER YANG BENAR
   function startAnimationLoop(mediaEl, type, effect, audioEl) {
     function render() {
-      // LAYER 1: Background Gambar / Video
       ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
-
-      // LAYER 2: Efek Hujan / Api / Bintang
       updateAndDrawParticles(effect);
 
-      // LAYER 3: Teks Lirik Sesuai Timestamp Detik Audio (Paling Atas)
       const currentTime = audioEl.currentTime;
       const currentLyric = srtSubtitles.find(sub => currentTime >= sub.start && currentTime <= sub.end);
 
@@ -295,16 +300,13 @@
         const text = currentLyric.text;
         const textWidth = ctx.measureText(text).width;
 
-        // Background Kotak Transparan Teks
         ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
         ctx.fillRect(canvas.width / 2 - textWidth / 2 - 20, yPos - fontSize, textWidth + 40, fontSize + 20);
 
-        // Stroke / Outline Hitam pada Teks
         ctx.strokeStyle = "#000000";
         ctx.lineWidth = 6;
         ctx.strokeText(text, canvas.width / 2, yPos);
 
-        // Isi Teks Warna Kuning Keemasan Terang
         ctx.fillStyle = "#facc15";
         ctx.fillText(text, canvas.width / 2, yPos);
         
