@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Music Video Creator (Lightweight Slicer)</title>
+  <title>AI Music Video Creator</title>
   <style>
     :root {
       --bg: #f0fdf4;
@@ -89,7 +89,7 @@
 
 <div class="container">
   <h1>🌿 AI Music Video Creator</h1>
-  <p class="subtitle">Smart Ultra-Light Precision Engine</p>
+  <p class="subtitle">Smart Lightweight Video Generator</p>
 
   <div class="form-group">
     <label for="audioInput">🎵 1. Upload File Audio MP3:</label>
@@ -97,7 +97,7 @@
   </div>
 
   <div class="form-group">
-    <label for="bgInput">🖼️ 2. Upload Gambar / Video Background Asli:</label>
+    <label for="bgInput">🖼️ 2. Upload Gambar / Video Background:</label>
     <input type="file" id="bgInput" accept="image/*,video/*">
   </div>
 
@@ -146,7 +146,6 @@
 </div>
 
 <script>
-  // POTONG MENJADI CHUNK 25 DETIK AGAR UKURAN FILE SANGAT KECIL (<800KB)
   const CHUNK_DURATION = 25; 
 
   const labelLebar = document.getElementById('labelLebar');
@@ -170,7 +169,7 @@
   const ctx = canvas.getContext('2d');
 
   let particles = [];
-  let srtSubtitles = [];
+  let parsedSubtitles = [];
   let mediaRecorder = null;
   let recordedChunks = [];
   let selectedMimeType = 'video/mp4';
@@ -187,7 +186,7 @@
     }
 
     if (!rawLyricsText.trim()) {
-      return alert("Harap tempelkan lirik lagu secara berurutan di kotak nomor 3!");
+      return alert("Harap tempelkan lirik lagu secara berurutan!");
     }
 
     if (aspectRatio === '16:9') {
@@ -202,7 +201,7 @@
       progressContainer.style.display = "block";
       previewArea.style.display = "block";
 
-      statusText.innerText = "⏳ Membaca audio & membagi baris lirik sekuensil...";
+      statusText.innerText = "⏳ Membaca audio & menyelaraskan data...";
       
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
@@ -217,7 +216,7 @@
         .filter(l => l.length > 0 && !l.startsWith('['));
 
       const linesPerChunk = Math.ceil(lyricLines.length / totalChunks);
-      let rawSrtText = "";
+      parsedSubtitles = [];
 
       for (let i = 0; i < totalChunks; i++) {
         const startSec = i * CHUNK_DURATION;
@@ -228,7 +227,7 @@
         const chunkLyricsText = chunkLyricLines.join('\n');
 
         progressBar.style.width = `${Math.round(((i + 1) / totalChunks) * 50)}%`;
-        statusText.innerText = `🔄 Gemini memproses bagian ${i + 1} dari ${totalChunks} (${Math.floor(startSec)}s - ${Math.floor(endSec)}s)...`;
+        statusText.innerText = `🔄 Memproses bagian lirik ${i + 1} dari ${totalChunks} (AI)...`;
 
         const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
         const base64Audio = await blobToBase64(chunkBlob);
@@ -245,50 +244,39 @@
           })
         });
 
-        const responseText = await res.text();
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error(`Response Server bukan JSON: ${responseText.substring(0, 150)}`);
-        }
-
+        const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
-        rawSrtText += (data.srt || "") + "\n\n";
+        
+        if (data.subtitles && Array.isArray(data.subtitles)) {
+          parsedSubtitles.push(...data.subtitles);
+        }
       }
 
-      srtSubtitles = parseSRT(rawSrtText);
-      console.log("SRT Result:", srtSubtitles);
+      console.log("Subtitles Sync Result:", parsedSubtitles);
       progressBar.style.width = "60%";
 
-      statusText.innerText = "🎥 Memulai pemutaran & perekaman MP4...";
+      statusText.innerText = "🎥 Menyiapkan rekaman video...";
       initParticles(selectedEffect, canvas.width, canvas.height);
 
       const audioEl = new Audio(URL.createObjectURL(audioFile));
+      audioEl.crossOrigin = "anonymous";
 
       if (bgFile.type.startsWith('video/')) {
         const videoEl = document.createElement('video');
         videoEl.src = URL.createObjectURL(bgFile);
-        videoEl.loop = true; videoEl.muted = true;
+        videoEl.muted = true;
+        videoEl.loop = true;
+        videoEl.playsInline = true;
         
         videoEl.onloadedmetadata = () => {
           videoEl.play();
-          audioEl.play();
-          setupRecorderWithAudio(audioEl);
-          startAnimationLoop(videoEl, 'video', selectedEffect, audioEl);
-          progressBar.style.width = "100%";
-          statusText.innerText = "🎉 Video sedang merekam ke MP4... Mohon tunggu lagu selesai.";
+          setupRecorderAndStart(audioEl, videoEl, 'video', selectedEffect);
         };
       } else {
         const imgEl = new Image();
         imgEl.src = URL.createObjectURL(bgFile);
-        
         imgEl.onload = () => {
-          audioEl.play();
-          setupRecorderWithAudio(audioEl);
-          startAnimationLoop(imgEl, 'image', selectedEffect, audioEl);
-          progressBar.style.width = "100%";
-          statusText.innerText = "🎉 Video sedang merekam ke MP4... Mohon tunggu lagu selesai.";
+          setupRecorderAndStart(audioEl, imgEl, 'image', selectedEffect);
         };
       }
 
@@ -299,13 +287,73 @@
     }
   });
 
+  function setupRecorderAndStart(audioEl, mediaEl, type, effect) {
+    recordedChunks = [];
+    const canvasStream = canvas.captureStream(30);
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaElementSource(audioEl);
+    const dest = audioCtx.createMediaStreamDestination();
+    source.connect(dest);
+    source.connect(audioCtx.destination);
+
+    const combinedStream = new MediaStream();
+    canvasStream.getVideoTracks().forEach(track => combinedStream.addTrack(track));
+    dest.stream.getAudioTracks().forEach(track => combinedStream.addTrack(track));
+
+    const types = [
+      'video/mp4;codecs=h264,aac',
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm'
+    ];
+    selectedMimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+
+    mediaRecorder = new MediaRecorder(combinedStream, { mimeType: selectedMimeType });
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(recordedChunks, { type: selectedMimeType });
+      const videoUrl = URL.createObjectURL(blob);
+      
+      downloadBtn.style.display = "block";
+      downloadBtn.innerText = `💾 Unduh Hasil Video (${ext.toUpperCase()})`;
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = videoUrl;
+        a.download = `music_video_lyric.${ext}`;
+        a.click();
+      };
+      statusText.innerText = "🎉 Rekaman Selesai! Klik tombol unduh di atas.";
+      startBtn.disabled = false;
+    };
+
+    // Mulai merekam dulu, baru nyalakan audio agar sinkron dari awal frame
+    mediaRecorder.start();
+    audioEl.play();
+    
+    progressBar.style.width = "100%";
+    statusText.innerText = "🎉 Video sedang direkam. Mohon tunggu lagu selesai dimainkan...";
+
+    startAnimationLoop(mediaEl, type, effect, audioEl);
+  }
+
   function startAnimationLoop(mediaEl, type, effect, audioEl) {
     function render() {
-      ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
+      if (type === 'video') {
+        ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
+      }
+      
       updateAndDrawParticles(effect);
 
       const currentTime = audioEl.currentTime;
-      const currentLyric = srtSubtitles.find(sub => currentTime >= sub.start && currentTime <= sub.end);
+      const currentLyric = parsedSubtitles.find(sub => currentTime >= sub.start && currentTime <= sub.end);
 
       if (currentLyric) {
         ctx.save();
@@ -313,11 +361,11 @@
         ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
         ctx.textAlign = "center";
         
-        const yPos = canvas.height - 100;
+        const yPos = canvas.height - 150;
         const text = currentLyric.text;
         const textWidth = ctx.measureText(text).width;
 
-        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
         ctx.fillRect(canvas.width / 2 - textWidth / 2 - 20, yPos - fontSize, textWidth + 40, fontSize + 20);
 
         ctx.strokeStyle = "#000000";
@@ -341,76 +389,6 @@
     render();
   }
 
-  function setupRecorderWithAudio(audioEl) {
-    recordedChunks = [];
-    const canvasStream = canvas.captureStream(30);
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioCtx.createMediaElementSource(audioEl);
-    const dest = audioCtx.createMediaStreamDestination();
-    source.connect(dest);
-    source.connect(audioCtx.destination);
-
-    const combinedStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...dest.stream.getAudioTracks()
-    ]);
-
-    const types = [
-      'video/mp4;codecs=h264,aac',
-      'video/mp4',
-      'video/webm;codecs=vp9,opus',
-      'video/webm'
-    ];
-
-    selectedMimeType = types.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
-
-    mediaRecorder = new MediaRecorder(combinedStream, { mimeType: selectedMimeType });
-
-    mediaRecorder.ondataavailable = e => {
-      if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-
-    mediaRecorder.onstop = () => {
-      const ext = selectedMimeType.includes('mp4') ? 'mp4' : 'webm';
-      const blob = new Blob(recordedChunks, { type: selectedMimeType });
-      const videoUrl = URL.createObjectURL(blob);
-      
-      downloadBtn.style.display = "block";
-      downloadBtn.innerText = `💾 Unduh Hasil Video (${ext.toUpperCase()})`;
-      downloadBtn.onclick = () => {
-        const a = document.createElement('a');
-        a.href = videoUrl;
-        a.download = `music_video_lyric.${ext}`;
-        a.click();
-      };
-      statusText.innerText = "🎉 Selesai 100%! Video beserta Audio & Lirik berhasil direkam.";
-      startBtn.disabled = false;
-    };
-
-    mediaRecorder.start();
-  }
-
-  function parseSRT(srtText) {
-    const items = [];
-    const blocks = srtText.trim().split(/\n\s*\n/);
-    
-    for (let block of blocks) {
-      const lines = block.split('\n');
-      if (lines.length >= 3) {
-        const timeMatch = lines[1].match(/(\d+):(\d+):(\d+),(\d+)\s*-->\s*(\d+):(\d+):(\d+),(\d+)/);
-        if (timeMatch) {
-          const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
-          const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
-          const text = lines.slice(2).join(' ');
-          items.push({ start, end, text });
-        }
-      }
-    }
-    return items;
-  }
-
-  // KOMPRESI ULTRA RINGAN (8kHz MONO) -> UKURAN FILE CHUNK HANYA ~400KB!
   async function sliceAndCompressAudio(buffer, startSec, endSec) {
     const targetSampleRate = 8000; 
     const duration = endSec - startSec;
