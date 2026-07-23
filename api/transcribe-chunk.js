@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+  // Hanya izinkan method POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -7,44 +8,35 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Vercel!' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY belum dipasang di Vercel Environment Variables!' });
   }
 
   try {
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    const listData = await listRes.json();
-
-    if (!listRes.ok || !listData.models) {
-      throw new Error(listData.error?.message || "Gagal mengambil daftar model");
-    }
-
-    const availableModels = listData.models
-      .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-      .map(m => m.name.replace('models/', ''));
-
-    let selectedModel = availableModels.find(m => m.includes('flash')) || availableModels[0];
-
     const endSec = offsetSeconds + duration;
 
-    // PROMPT DENGAN PEMBATASAN LIRIK SEKUENSIL DARI BROWSER
-    const prompt = `Kamu adalah pencocok timestamp lirik (Audio-Lyric Aligner) yang sangat presisi.
+    // Prompt Dibuat Sangat Ketat & Jelas
+    const prompt = `Kamu adalah pencocok timestamp lirik audio yang sangat presisi.
 
-Dengarkan potongan audio ini yang diambil dari detik ke-${offsetSeconds} sampai detik ke-${endSec} dari lagu utama.
+Dengarkan potongan audio ini (detik ${offsetSeconds} sampai ${endSec} dari lagu utama).
 
-LIRIK KHUSUS POTONGAN AUDIO INI:
+LIRIK UNTUK BAGIAN INI:
 """
 ${chunkLyrics || ''}
 """
 
-TUGAS UTAMA:
-1. Dengarkan vokal dalam audio dan tentukan timestamp mulai dan selesai untuk baris-baris lirik di atas.
-2. SEMUA timestamp SRT WAJIB ditambahkan offset awal yaitu ${offsetSeconds} detik (sehingga timestamp mencerminkan posisi di lagu utama).
-3. HANYA keluarkan baris lirik yang BENAR-BENAR TERDENGAR dinyanyikan pada rentang waktu detik ${offsetSeconds}s - ${endSec}s ini.
-4. Keluarkan HANYA teks format SRT yang valid tanpa pembuka/penutup markdown. Jika tidak ada vokal sama sekali, kembalikan teks kosong.`;
+TUGAS:
+1. Tentukan timestamp mulai dan selesai untuk lirik di atas yang terdengar di potongan audio ini.
+2. Tambahkan offset ${offsetSeconds} detik pada setiap timestamp SRT agar sesuai waktu lagu utama.
+3. HANYA keluarkan format SRT murni tanpa kata pembuka/penutup atau tag markdown (```srt).`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
+    // Tembak LANGSUNG ke model gemini-1.5-flash tanpa meminta list models dulu
+    const targetUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKey}`;
+
+    const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify({
         contents: [{
           parts: [
@@ -61,10 +53,19 @@ TUGAS UTAMA:
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || 'Gagal memproses dengan Gemini');
+
+    if (!response.ok) {
+      // Tangkap pesan error detail dari Google jika ada
+      const googleError = data.error?.message || JSON.stringify(data.error) || 'Gagal merespon dari Google API';
+      throw new Error(`Google API Error (${response.status}): ${googleError}`);
+    }
 
     const srtText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return res.status(200).json({ srt: srtText });
+    
+    // Bersihkan jika Gemini tidak sengaja memberi wrapper markdown ```srt
+    const cleanedSrt = srtText.replace(/```srt/g, '').replace(/```/g, '').trim();
+
+    return res.status(200).json({ srt: cleanedSrt });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
