@@ -55,18 +55,17 @@
             <!-- KUSTOMISASI LIRIK (FONT & POSISI) -->
             <div class="bg-gray-800/80 p-4 rounded-xl border border-gray-700 space-y-3">
                 <h3 class="text-sm font-semibold text-yellow-400 flex items-center gap-2">
-                    ⚙️ Kustomisasi Tampilan Lirik
+                    ⚙️ Kustomisasi Tampilan Lirik & Kompresi
                 </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <!-- Gaya Font -->
                     <div>
                         <label class="block text-xs text-gray-300 mb-1">Gaya Font Teks:</label>
                         <select id="fontFamily" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-yellow-500">
-                            <option value="sans-serif">Sans-Serif (Modern / Bersih)</option>
-                            <option value="serif">Serif (Klasik / Elegan)</option>
-                            <option value="monospace">Monospace (Ketik / Retro)</option>
-                            <option value="Impact">Impact (Bold / Tegas)</option>
-                            <option value="Trebuchet MS">Trebuchet MS (Casual)</option>
+                            <option value="sans-serif">Sans-Serif (Modern)</option>
+                            <option value="serif">Serif (Klasik)</option>
+                            <option value="monospace">Monospace (Retro)</option>
+                            <option value="Impact">Impact (Bold)</option>
                         </select>
                     </div>
 
@@ -75,10 +74,37 @@
                         <label class="block text-xs text-gray-300 mb-1">Posisi Teks (Vertikal):</label>
                         <select id="textPosition" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-yellow-500">
                             <option value="bottom">Bawah (Default)</option>
-                            <option value="center">Tengah (Center)</option>
-                            <option value="top">Atas (Top)</option>
+                            <option value="center">Tengah</option>
+                            <option value="top">Atas</option>
                         </select>
                     </div>
+
+                    <!-- Target Bitrate -->
+                    <div>
+                        <label class="block text-xs text-gray-300 mb-1">Target Kompresi MP4:</label>
+                        <select id="bitrateSetting" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-yellow-500">
+                            <option value="1000000">Ultra Ringan (~1 MB/menit)</option>
+                            <option value="1500000" selected>Sedang Medsos (~1.5 MB/menit)</option>
+                            <option value="2500000">Kualitas Tinggi (~2.5 MB/menit)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Format Ukuran Video (PILIHAN TEGAK / LEBAR) -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">📐 Format Ukuran Video Output:</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="border border-gray-700 bg-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-700 transition" id="labelLandscape">
+                        <input type="radio" name="videoFormat" value="landscape" class="sr-only" onclick="selectFormat('landscape')">
+                        <span class="text-lg font-medium text-gray-200">🖥️ Lebar (16:9)</span>
+                        <span class="text-xs text-gray-400">YouTube / Desktop (854x480)</span>
+                    </label>
+                    <label class="border-2 border-yellow-500 bg-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-700 transition" id="labelPortrait">
+                        <input type="radio" name="videoFormat" value="portrait" checked class="sr-only" onclick="selectFormat('portrait')">
+                        <span class="text-lg font-medium text-gray-200">📱 Tegak (9:16)</span>
+                        <span class="text-xs text-gray-400">Shorts / Reels / TikTok (480x854)</span>
+                    </label>
                 </div>
             </div>
 
@@ -109,9 +135,9 @@
 
             <!-- Canvas Live Preview -->
             <div>
-                <label class="block text-sm font-semibold text-gray-300 mb-2">📺 Live Preview Canvas (480p Ringan):</label>
-                <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-inner border border-gray-800 flex items-center justify-center">
-                    <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">📺 Live Preview Canvas:</label>
+                <div class="relative w-full bg-black rounded-xl overflow-hidden shadow-inner border border-gray-800 flex items-center justify-center p-4 min-h-[300px]">
+                    <canvas id="previewCanvas" class="max-h-[400px] object-contain"></canvas>
                 </div>
             </div>
 
@@ -147,16 +173,42 @@
         let particles = [];
         let audioCtx, analyser, dataArray;
         let lyricTimestamps = [];
+        let selectedFormat = 'portrait'; // Default ke Tegak (9:16)
 
         const canvas = document.getElementById('previewCanvas');
         const ctx = canvas.getContext('2d');
         
-        // RESOLUSI DIECILKAN KE 854x480 (480p SD - Sangat Ringan & Pas untuk Medsos)
-        canvas.width = 854;
-        canvas.height = 480;
+        // Pengaturan Resolusi Awal (Portrait 9:16 ringan)
+        updateCanvasDimensions();
 
         let bgImage = new Image();
         let bgLoaded = false;
+
+        function selectFormat(format) {
+            selectedFormat = format;
+            const land = document.getElementById('labelLandscape');
+            const port = document.getElementById('labelPortrait');
+            
+            if (format === 'landscape') {
+                land.className = "border-2 border-yellow-500 bg-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-700 transition";
+                port.className = "border border-gray-700 bg-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-700 transition";
+            } else {
+                port.className = "border-2 border-yellow-500 bg-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-700 transition";
+                land.className = "border border-gray-700 bg-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-700 transition";
+            }
+            updateCanvasDimensions();
+            initParticles();
+        }
+
+        function updateCanvasDimensions() {
+            if (selectedFormat === 'landscape') {
+                canvas.width = 854;
+                canvas.height = 480;
+            } else {
+                canvas.width = 480;
+                canvas.height = 854;
+            }
+        }
 
         // Upload Background
         document.getElementById('imageInput').addEventListener('change', (e) => {
@@ -178,7 +230,7 @@
 
         function initParticles() {
             particles = [];
-            const count = 100; // Jumlah partikel dikurangi sedikit agar render cepat
+            const count = 80; 
             for (let i = 0; i < count; i++) {
                 particles.push({
                     x: Math.random() * canvas.width,
@@ -206,7 +258,7 @@
             }
 
             // 2. Dark Overlay
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // 3. Render Animated Effects
@@ -259,7 +311,7 @@
                 const barWidth = (canvas.width / dataArray.length) * 2.2;
                 let x = 0;
                 for (let i = 0; i < dataArray.length; i++) {
-                    const barHeight = (dataArray[i] / 255) * 180;
+                    const barHeight = (dataArray[i] / 255) * 140;
                     ctx.fillStyle = `hsl(${i * 4}, 100%, 50%)`;
                     ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
                     x += barWidth;
@@ -281,7 +333,7 @@
             const activeLyric = lyricTimestamps.find(l => currentTime >= l.start && currentTime <= l.end);
 
             if (activeLyric && activeLyric.text) {
-                const fontSize = 28; // Disesuaikan dengan Canvas 480p
+                const fontSize = selectedFormat === 'landscape' ? 26 : 24;
                 ctx.font = `bold ${fontSize}px ${selectedFont}`;
                 ctx.textAlign = "center";
 
@@ -292,7 +344,7 @@
                 const text = activeLyric.text;
                 const textWidth = ctx.measureText(text).width;
 
-                ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+                ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
                 ctx.fillRect(canvas.width / 2 - textWidth / 2 - 15, textY - fontSize + 4, textWidth + 30, fontSize + 14);
 
                 ctx.strokeStyle = "#000000";
@@ -425,9 +477,12 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
             renderBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
             try {
+                // Pastikan ukuran canvas sesuai pilihan saat render dimulai
+                updateCanvasDimensions();
+
                 // STEP 1: AI Transkripsi
                 statusText.innerText = "⏳ Membaca & mengompresi audio untuk Gemini AI...";
-                progressBar.style.width = "10%";
+                progressBar.style.width = "10%data";
 
                 const audioEl = document.getElementById('audioElement');
                 audioEl.src = URL.createObjectURL(audioFile);
@@ -478,34 +533,36 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                 source.connect(dest);
                 source.connect(audioCtx.destination);
 
-                const canvasStream = canvas.captureStream(24); // 24 FPS cukup untuk video lirik & animasi halus
+                const canvasStream = canvas.captureStream(24); 
                 const combinedStream = new MediaStream([
                     ...canvasStream.getVideoTracks(),
                     ...dest.stream.getAudioTracks()
                 ]);
 
-                // PILIH FORMAT MP4 TERBAIK
                 const mp4Types = [
                     'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
                     'video/mp4;codecs=h264,aac',
                     'video/mp4',
-                    'video/webm;codecs=vp9', // Fallback jika browser sangat lama tak dukung MP4
+                    'video/webm;codecs=vp9',
                     'video/webm'
                 ];
                 
                 const chosenMime = mp4Types.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+                const isMp4 = chosenMime.includes('mp4');
 
-                // SETING BITRATE VIDEO HANYA 1.5 Mbps (Supaya file sangat kecil)
+                // Ambil batas bitrate dari pilihan UI
+                const targetBitrate = parseInt(document.getElementById('bitrateSetting')?.value || '1500000');
+
                 const recorder = new MediaRecorder(combinedStream, { 
                     mimeType: chosenMime,
-                    videoBitsPerSecond: 1500000 // 1.5 Mbps limit
+                    videoBitsPerSecond: targetBitrate
                 });
 
                 const chunks = [];
                 recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
                 recorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'video/mp4' }); // Tetap force tipe blob sebagai MP4
+                    const blob = new Blob(chunks, { type: chosenMime });
                     const videoUrl = URL.createObjectURL(blob);
 
                     const videoPreview = document.getElementById('videoPreview');
@@ -513,10 +570,10 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
 
                     videoPreview.src = videoUrl;
                     downloadBtn.href = videoUrl;
-                    downloadBtn.download = `Lyric-Video-${Date.now()}.mp4`;
+                    downloadBtn.download = `Animated-Lyric-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`;
 
                     document.getElementById('outputArea').classList.remove('hidden');
-                    statusText.innerText = "🎉 Video MP4 ringan berhasil dibuat!";
+                    statusText.innerText = `🎉 Video selesai! Ukuran file ringan (~${(blob.size / (1024 * 1024)).toFixed(2)} MB)`;
                     progressBar.style.width = "100%";
                     renderBtn.disabled = false;
                     renderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -528,7 +585,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                 audioEl.ontimeupdate = () => {
                     const progressPercent = 50 + ((audioEl.currentTime / audioEl.duration) * 50);
                     progressBar.style.width = `${progressPercent}%`;
-                    statusText.innerText = `🎬 Merender Video MP4: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
+                    statusText.innerText = `🎬 Merender Video: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
                 };
 
                 audioEl.onended = () => {
