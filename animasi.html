@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Dengan Animasi - Visual Effects Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen py-10 px-4 font-sans text-gray-100">
+
+    <div class="max-w-4xl mx-auto bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 overflow-hidden">
+        <!-- Header & Navigasi Tab -->
+        <div class="p-6 text-center border-b border-gray-800">
+            <h1 class="text-3xl font-bold text-yellow-400 flex justify-center items-center gap-2">
+                ✨ Animated Music Video Generator
+            </h1>
+            <p class="text-gray-400 text-sm mt-1">Sangat Cocok untuk Durasi Singkat hingga Menengah (1 - 15 Menit)</p>
+            
+            <!-- MENU NAVIGASI PILIHAN EDIT -->
+            <div class="mt-6 flex justify-center gap-3 bg-gray-800 p-1.5 rounded-xl border border-gray-700">
+                <a href="#" class="flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition bg-yellow-500 text-gray-900 shadow-md">
+                    ✨ EDIT DENGAN ANIMASI (1-15 Mins)
+                </a>
+                <a href="index.html" class="flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition text-gray-400 hover:text-white hover:bg-gray-700">
+                    🎬 EDIT VIDEO PANJANG
+                </a>
+            </div>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- Upload Options -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">🎵 Upload Audio (MP3):</label>
+                    <input type="file" id="audioInput" accept="audio/*" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">🖼️ Upload Background Image:</label>
+                    <input type="file" id="imageInput" accept="image/*" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400">
+                </div>
+            </div>
+
+            <!-- Pilih Efek Animasi -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">🎨 Pilih Efek Animasi Dynamic:</label>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <button type="button" onclick="selectEffect('rain')" id="btn-rain" class="effect-btn border-2 border-yellow-500 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700">
+                        🌧️ Air Hujan
+                    </button>
+                    <button type="button" onclick="selectEffect('lightning')" id="btn-lightning" class="effect-btn border border-gray-700 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700">
+                        ⚡ Petir & Hujan
+                    </button>
+                    <button type="button" onclick="selectEffect('fire')" id="btn-fire" class="effect-btn border border-gray-700 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700">
+                        🔥 Api & Bara
+                    </button>
+                    <button type="button" onclick="selectEffect('stars')" id="btn-stars" class="effect-btn border border-gray-700 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700">
+                        🌟 Bintang & Galaxy
+                    </button>
+                    <button type="button" onclick="selectEffect('snow')" id="btn-snow" class="effect-btn border border-gray-700 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700">
+                        ❄️ Salju Syahdu
+                    </button>
+                    <button type="button" onclick="selectEffect('spectrum')" id="btn-spectrum" class="effect-btn border border-gray-700 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700">
+                        📊 Audio Spectrum
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Live Preview -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">📺 Live Preview Canvas:</label>
+                <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-inner border border-gray-800 flex items-center justify-center">
+                    <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
+                </div>
+            </div>
+
+            <!-- Status Area -->
+            <div id="statusArea" class="hidden p-4 bg-gray-800 rounded-lg border border-gray-700 text-sm space-y-2">
+                <p id="statusText" class="font-semibold text-yellow-400">Siap merender video...</p>
+                <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div id="progressBar" class="bg-yellow-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <button id="renderBtn" onclick="startRenderProcess()" class="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold rounded-xl shadow-lg transition flex justify-center items-center gap-2 text-lg">
+                🎬 Render & Rekam Video Animasi
+            </button>
+
+            <!-- Output Preview -->
+            <div id="outputArea" class="hidden space-y-4 pt-4 border-t border-gray-800">
+                <h3 class="text-lg font-bold text-gray-200">Hasil Video Animasi Output:</h3>
+                <video id="videoPreview" controls class="w-full rounded-lg shadow-md max-h-[400px] bg-black"></video>
+                <a id="downloadBtn" class="block text-center py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-md transition cursor-pointer">
+                    💾 Download Video (MP4 / WebM)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audioElement" class="hidden"></audio>
+
+    <script>
+        let currentEffect = 'rain';
+        let animationId = null;
+        let particles = [];
+        let audioCtx, analyser, dataArray;
+
+        const canvas = document.getElementById('previewCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1280;
+        canvas.height = 720;
+
+        let bgImage = new Image();
+        let bgLoaded = false;
+
+        // Event listener saat unggah gambar
+        document.getElementById('imageInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                bgImage.src = URL.createObjectURL(file);
+                bgImage.onload = () => { bgLoaded = true; };
+            }
+        });
+
+        function selectEffect(effect) {
+            currentEffect = effect;
+            document.querySelectorAll('.effect-btn').forEach(btn => {
+                btn.className = "effect-btn border border-gray-700 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700";
+            });
+            document.getElementById(`btn-${effect}`).className = "effect-btn border-2 border-yellow-500 bg-gray-800 p-3 rounded-xl flex items-center gap-3 font-semibold text-sm hover:bg-gray-700";
+            initParticles();
+        }
+
+        function initParticles() {
+            particles = [];
+            const count = 150;
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    speed: Math.random() * 8 + 4,
+                    size: Math.random() * 3 + 1,
+                    alpha: Math.random()
+                });
+            }
+        }
+        initParticles();
+
+        function drawFrame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Background Image
+            if (bgLoaded) {
+                const scale = Math.max(canvas.width / bgImage.width, canvas.height / bgImage.height);
+                const imgW = bgImage.width * scale;
+                const imgH = bgImage.height * scale;
+                ctx.drawImage(bgImage, (canvas.width / 2) - (imgW / 2), (canvas.height / 2) - (imgH / 2), imgW, imgH);
+            } else {
+                ctx.fillStyle = '#050510';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Draw Dark Overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render Animated Effects
+            if (currentEffect === 'rain' || currentEffect === 'lightning') {
+                ctx.strokeStyle = 'rgba(174, 194, 224, 0.6)';
+                ctx.lineWidth = 1.5;
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p.x - 2, p.y + p.speed * 3);
+                    ctx.stroke();
+
+                    p.y += p.speed;
+                    p.x -= 0.5;
+                    if (p.y > canvas.height) { p.y = -10; p.x = Math.random() * canvas.width; }
+                });
+
+                if (currentEffect === 'lightning' && Math.random() < 0.02) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+            } else if (currentEffect === 'fire') {
+                particles.forEach(p => {
+                    ctx.fillStyle = `rgba(${255}, ${Math.floor(Math.random() * 150)}, 0, ${p.alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    p.y -= p.speed * 0.5;
+                    p.alpha -= 0.008;
+                    if (p.y < 0 || p.alpha <= 0) {
+                        p.y = canvas.height + 10;
+                        p.x = Math.random() * canvas.width;
+                        p.alpha = Math.random();
+                    }
+                });
+            } else if (currentEffect === 'stars' || currentEffect === 'snow') {
+                particles.forEach(p => {
+                    ctx.fillStyle = currentEffect === 'stars' ? `rgba(255, 255, 255, ${Math.abs(Math.sin(p.alpha))})` : 'rgba(255, 255, 255, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    p.y += currentEffect === 'snow' ? p.speed * 0.3 : 0;
+                    p.alpha += 0.02;
+                    if (p.y > canvas.height) { p.y = -5; p.x = Math.random() * canvas.width; }
+                });
+            } else if (currentEffect === 'spectrum' && analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                const barWidth = (canvas.width / dataArray.length) * 2.5;
+                let x = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const barHeight = (dataArray[i] / 255) * 250;
+                    ctx.fillStyle = `hsl(${i * 4}, 100%, 50%)`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
+                    x += barWidth;
+                }
+            }
+
+            animationId = requestAnimationFrame(drawFrame);
+        }
+
+        drawFrame();
+
+        async function startRenderProcess() {
+            const audioFile = document.getElementById('audioInput').files[0];
+            if (!audioFile) return alert('Silakan upload file Audio MP3 terlebih dahulu.');
+
+            const audioEl = document.getElementById('audioElement');
+            audioEl.src = URL.createObjectURL(audioFile);
+
+            const statusArea = document.getElementById('statusArea');
+            const statusText = document.getElementById('statusText');
+            const progressBar = document.getElementById('progressBar');
+            const renderBtn = document.getElementById('renderBtn');
+
+            statusArea.classList.remove('hidden');
+            renderBtn.disabled = true;
+            renderBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            await new Promise((res) => audioEl.onloadedmetadata = () => res());
+
+            // Setup Audio Context & Analyser untuk efek Spectrum
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 128;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            const source = audioCtx.createMediaElementSource(audioEl);
+            const dest = audioCtx.createMediaStreamDestination();
+            source.connect(analyser);
+            source.connect(dest);
+            source.connect(audioCtx.destination);
+
+            const canvasStream = canvas.captureStream(30);
+            const combinedStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...dest.stream.getAudioTracks()
+            ]);
+
+            const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp9', 'video/webm'];
+            const chosenMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+
+            const recorder = new MediaRecorder(combinedStream, { mimeType: chosenMime });
+            const chunks = [];
+
+            recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+            recorder.onstop = () => {
+                const isMp4 = chosenMime.includes('mp4');
+                const blob = new Blob(chunks, { type: chosenMime });
+                const videoUrl = URL.createObjectURL(blob);
+
+                const videoPreview = document.getElementById('videoPreview');
+                const downloadBtn = document.getElementById('downloadBtn');
+
+                videoPreview.src = videoUrl;
+                downloadBtn.href = videoUrl;
+                downloadBtn.download = `Animated-Video-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`;
+
+                document.getElementById('outputArea').classList.remove('hidden');
+                statusText.innerText = "🎉 Video animasi selesai dibuat!";
+                progressBar.style.width = "100%";
+                renderBtn.disabled = false;
+                renderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            };
+
+            audioEl.play();
+            recorder.start();
+
+            audioEl.ontimeupdate = () => {
+                const progressPercent = (audioEl.currentTime / audioEl.duration) * 100;
+                progressBar.style.width = `${progressPercent}%`;
+                statusText.innerText = `📹 Merender Video Animasi: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
+            };
+
+            audioEl.onended = () => {
+                recorder.stop();
+            };
+        }
+    </script>
+</body>
+</html>
