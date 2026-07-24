@@ -93,8 +93,7 @@
     <canvas id="renderCanvas" class="hidden"></canvas>
     <audio id="audioPlayback" class="hidden"></audio>
 
-    <script>
-        let selectedFormat = 'landscape';
+let selectedFormat = 'landscape';
         let lyricTimestamps = [];
 
         function selectFormat(format) {
@@ -116,7 +115,6 @@
             const imageFile = document.getElementById('imageInput').files[0];
             const lyricsText = document.getElementById('lyricsInput').value;
 
-            if (!apiKey) return alert("Silakan masukkan Gemini API Key terlebih dahulu.");
             if (!audioFile) return alert("Silakan unggah file audio MP3.");
             if (!imageFile) return alert("Silakan unggah gambar background.");
             if (!lyricsText.trim()) return alert("Silakan isi teks lirik.");
@@ -138,13 +136,27 @@
                 });
                 const duration = audio.duration;
 
-                // 2. Minta bantuan Gemini AI untuk membagi durasi lirik
+                // 2. Coba minta bantuan Gemini AI untuk membagi durasi lirik
                 statusText.innerText = "Menghubungkan ke Gemini AI untuk sinkronisasi lirik...";
                 progressBar.style.width = "25%";
-                lyricTimestamps = await getTimestampsFromGemini(apiKey, lyricsText, duration);
+                
+                if (apiKey.trim() !== "") {
+                    try {
+                        lyricTimestamps = await getTimestampsFromGemini(apiKey, lyricsText, duration);
+                        statusText.innerText = "Sinkronisasi lirik dengan AI berhasil.";
+                    } catch (aiError) {
+                        console.warn("Gemini API Error, beralih ke pembagian durasi manual:", aiError.message);
+                        statusText.innerText = "Gemini API terkendala. Menggunakan pembagian durasi otomatis...";
+                        lyricTimestamps = generateFallbackTimestamps(lyricsText, duration);
+                    }
+                } else {
+                    // Jika tidak ada API key, langsung gunakan pembagian rata otomatis
+                    statusText.innerText = "Tanpa API Key. Menggunakan pembagian durasi otomatis...";
+                    lyricTimestamps = generateFallbackTimestamps(lyricsText, duration);
+                }
 
                 if (!lyricTimestamps || lyricTimestamps.length === 0) {
-                    throw new Error("Gagal mendapatkan sinkronisasi lirik dari AI.");
+                    throw new Error("Gagal menyusun lirik.");
                 }
 
                 // 3. Mulai Render dan Rekam Video
@@ -159,6 +171,7 @@
             }
         }
 
+        // Fungsi sinkronisasi dengan Gemini API dengan validasi respon yang lebih ketat
         async function getTimestampsFromGemini(apiKey, lyrics, duration) {
             const prompt = `Anda adalah asisten pembuat video musik. Saya memiliki lagu berdurasi ${duration} detik. 
 Berikut adalah teks lirik lagu tersebut:
@@ -181,12 +194,37 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                 })
             });
 
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(errorBody.error?.message || `HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            let rawText = data.candidates[0].content.parts[0].text;
             
-            // Membersihkan tag markdown jika AI mengembalikannya
+            // Validasi apakah properti candidates ada dalam respon API
+            if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content?.parts?.[0]?.text) {
+                throw new Error("Struktur respon Gemini API tidak sesuai atau diblokir oleh kebijakan keamanan AI.");
+            }
+
+            let rawText = data.candidates[0].content.parts[0].text;
             rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
             return JSON.parse(rawText);
+        }
+
+        // Fungsi Cadangan: Jika Gemini API gagal/tidak diisi, lirik dibagi rata durasinya
+        function generateFallbackTimestamps(lyrics, duration) {
+            const lines = lyrics.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            const totalLines = lines.length;
+            if (totalLines === 0) return [];
+
+            const durationPerLine = duration / totalLines;
+            return lines.map((line, index) => {
+                return {
+                    text: line,
+                    start: index * durationPerLine,
+                    end: (index + 1) * durationPerLine
+                };
+            });
         }
 
         function renderAndRecord(audio, imageFile) {
@@ -194,7 +232,6 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                 const canvas = document.getElementById('renderCanvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Atur dimensi berdasarkan pilihan format
                 if (selectedFormat === 'landscape') {
                     canvas.width = 1280;
                     canvas.height = 720;
@@ -206,21 +243,18 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                 const img = new Image();
                 img.src = URL.createObjectURL(imageFile);
                 img.onload = () => {
-                    // Siapkan Audio Node untuk perekaman suara
                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                     const source = audioCtx.createMediaElementSource(audio);
                     const dest = audioCtx.createMediaStreamDestination();
                     source.connect(dest);
-                    source.connect(audioCtx.destination); // Agar pengguna tetap bisa mendengar suara saat render
+                    source.connect(audioCtx.destination);
 
-                    // Gabungkan visual canvas dan audio ke dalam satu stream
-                    const canvasStream = canvas.captureStream(30); // 30 FPS
+                    const canvasStream = canvas.captureStream(30); 
                     const combinedStream = new MediaStream([
                         ...canvasStream.getVideoTracks(),
                         ...dest.stream.getAudioTracks()
                     ]);
 
-                    // Gunakan MediaRecorder untuk merekam gabungan stream tersebut
                     const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9' });
                     const chunks = [];
 
@@ -232,7 +266,6 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                         const blob = new Blob(chunks, { type: 'video/webm' });
                         const videoUrl = URL.createObjectURL(blob);
                         
-                        // Tampilkan hasil akhir
                         const videoPreview = document.getElementById('videoPreview');
                         const downloadBtn = document.getElementById('downloadBtn');
                         
@@ -246,11 +279,9 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                         resolve();
                     };
 
-                    // Jalankan audio dan perekaman
                     audio.play();
                     recorder.start();
 
-                    // Fungsi Loop Rendering Frame demi Frame
                     function drawFrame() {
                         if (audio.paused || audio.ended) {
                             recorder.stop();
@@ -258,17 +289,14 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                             return;
                         }
 
-                        // 1. Gambar Background (Cover Fill)
                         const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
                         const x = (canvas.width / 2) - (img.width / 2) * scale;
                         const y = (canvas.height / 2) - (img.height / 2) * scale;
                         ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
 
-                        // Overlay Gelap agar teks mudah terbaca
                         ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                        // 2. Gambar Lirik Aktif berdasarkan waktu audio berjalan
                         const currentTime = audio.currentTime;
                         const activeLyric = lyricTimestamps.find(l => currentTime >= l.start && currentTime <= l.end);
 
@@ -279,11 +307,9 @@ Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, t
                             ctx.shadowColor = "black";
                             ctx.shadowBlur = 10;
                             
-                            // Letakkan teks di area tengah bawah
                             ctx.fillText(activeLyric.text, canvas.width / 2, canvas.height * 0.8);
                         }
 
-                        // Update progress bar UI
                         const progressPercent = (currentTime / audio.duration) * 50 + 50;
                         document.getElementById('progressBar').style.width = `${progressPercent}%`;
                         document.getElementById('statusText').innerText = `Merender Frame: ${Math.floor(currentTime)}s / ${Math.floor(audio.duration)}s`;
