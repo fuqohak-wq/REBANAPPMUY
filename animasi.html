@@ -47,9 +47,16 @@
                     <input type="file" id="audioInput" accept="audio/*" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-300 mb-2">🖼️ Upload Background Image:</label>
-                    <input type="file" id="imageInput" accept="image/*" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400">
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">🖼️ / 🎥 Upload Background (Bisa Banyak Foto / Video):</label>
+                    <input type="file" id="mediaInput" accept="image/*,video/*" multiple class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400">
+                    <p class="text-xs text-gray-400 mt-1">*Jika pilih banyak foto, akan berganti otomatis (Slideshow). Video otomatis silent.</p>
                 </div>
+            </div>
+
+            <!-- Kolom Teks Lirik Acuan -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">📜 Acuan Teks Lirik (Opsional - Supaya AI Tidak Ngarang):</label>
+                <textarea id="lyricsReference" rows="4" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-yellow-500 placeholder-gray-500" placeholder="Paste lirik lagu di sini... AI akan mencocokkan waktu lirik berdasarkan teks asli ini sehingga 100% akurat."></textarea>
             </div>
 
             <!-- KUSTOMISASI LIRIK (FONT & POSISI) -->
@@ -173,16 +180,17 @@
         let particles = [];
         let audioCtx, analyser, dataArray;
         let lyricTimestamps = [];
-        let selectedFormat = 'portrait'; // Default ke Tegak (9:16)
+        let selectedFormat = 'portrait'; 
 
         const canvas = document.getElementById('previewCanvas');
         const ctx = canvas.getContext('2d');
         
-        // Pengaturan Resolusi Awal (Portrait 9:16 ringan)
         updateCanvasDimensions();
 
-        let bgImage = new Image();
-        let bgLoaded = false;
+        // Variabel penampung Media Background
+        let mediaMode = 'none'; // 'images', 'video', 'none'
+        let bgImages = [];
+        let bgVideo = null;
 
         function selectFormat(format) {
             selectedFormat = format;
@@ -210,12 +218,34 @@
             }
         }
 
-        // Upload Background
-        document.getElementById('imageInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                bgImage.src = URL.createObjectURL(file);
-                bgImage.onload = () => { bgLoaded = true; };
+        // Handle Upload Background (Multi Foto / Video)
+        document.getElementById('mediaInput').addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+
+            bgImages = [];
+            if (bgVideo) {
+                bgVideo.pause();
+                bgVideo = null;
+            }
+
+            const firstFile = files[0];
+            if (firstFile.type.startsWith('video/')) {
+                mediaMode = 'video';
+                bgVideo = document.createElement('video');
+                bgVideo.src = URL.createObjectURL(firstFile);
+                bgVideo.muted = true; // Otomatis Silent
+                bgVideo.loop = true;
+                bgVideo.play();
+            } else {
+                mediaMode = 'images';
+                files.forEach(file => {
+                    if (file.type.startsWith('image/')) {
+                        const img = new Image();
+                        img.src = URL.createObjectURL(file);
+                        bgImages.push(img);
+                    }
+                });
             }
         });
 
@@ -246,12 +276,23 @@
         function drawFrame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Background Image
-            if (bgLoaded) {
-                const scale = Math.max(canvas.width / bgImage.width, canvas.height / bgImage.height);
-                const imgW = bgImage.width * scale;
-                const imgH = bgImage.height * scale;
-                ctx.drawImage(bgImage, (canvas.width / 2) - (imgW / 2), (canvas.height / 2) - (imgH / 2), imgW, imgH);
+            const audioEl = document.getElementById('audioElement');
+            const currentTime = audioEl ? audioEl.currentTime : 0;
+            const duration = audioEl ? (audioEl.duration || 1) : 1;
+
+            // 1. Render Background
+            if (mediaMode === 'video' && bgVideo && bgVideo.readyState >= 2) {
+                drawScaledMedia(bgVideo);
+            } else if (mediaMode === 'images' && bgImages.length > 0) {
+                // Multi-foto slideshow berdasarkan progress durasi audio
+                const imageIndex = Math.min(
+                    Math.floor((currentTime / duration) * bgImages.length),
+                    bgImages.length - 1
+                );
+                const currentImg = bgImages[imageIndex];
+                if (currentImg && currentImg.complete) {
+                    drawScaledMedia(currentImg);
+                }
             } else {
                 ctx.fillStyle = '#050510';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -322,6 +363,15 @@
             renderLyricText();
 
             animationId = requestAnimationFrame(drawFrame);
+        }
+
+        function drawScaledMedia(media) {
+            const mediaW = media.videoWidth || media.width;
+            const mediaH = media.videoHeight || media.height;
+            const scale = Math.max(canvas.width / mediaW, canvas.height / mediaH);
+            const imgW = mediaW * scale;
+            const imgH = mediaH * scale;
+            ctx.drawImage(media, (canvas.width / 2) - (imgW / 2), (canvas.height / 2) - (imgH / 2), imgW, imgH);
         }
 
         function renderLyricText() {
@@ -404,19 +454,24 @@
             return new Blob([wavBuffer], { type: 'audio/wav' });
         }
 
-        async function extractLyricsWithGeminiChunk(audioChunkBlob, chunkStartTime, apiKey) {
+        async function extractLyricsWithGeminiChunk(audioChunkBlob, chunkStartTime, apiKey, lyricsRef) {
             const base64Audio = await new Promise((res) => {
                 const reader = new FileReader();
                 reader.onloadend = () => res(reader.result.split(',')[1]);
                 reader.readAsDataURL(audioChunkBlob);
             });
 
-            const promptText = `Transkripsikan lirik lagu dari audio ini lengkap dengan timestamp waktu mulai dan selesai.
+            let promptText = `Transkripsikan lirik lagu dari audio ini lengkap dengan timestamp waktu mulai dan selesai.
 Respons WAJIB berupa JSON ARRAY murni tanpa teks/markdown tambahan:
 [
   {"text": "Lirik baris pertama", "start": 0.0, "end": 4.5}
 ]
 Catatan: Akurasikan detik lirik dengan lagu!`;
+
+            if (lyricsRef && lyricsRef.trim() !== "") {
+                promptText += `\n\nACUAN LIRIK ASLI (Gunakan kata/lirik ini secara ketat, hanya selaraskan urutan dan timestamp detiknya sesuai suara audio):
+${lyricsRef}`;
+            }
 
             const payload = {
                 contents: [{
@@ -436,7 +491,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                         body: JSON.stringify(payload)
                     });
 
-                    if (response.status === 429) {
+                    if (response.status === 429 || response.status === 503) {
                         attempts++;
                         await new Promise(r => setTimeout(r, 4000 * attempts));
                         continue;
@@ -463,6 +518,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
         async function startRenderProcess() {
             const apiKey = document.getElementById('apiKey').value.trim();
             const audioFile = document.getElementById('audioInput').files[0];
+            const lyricsRef = document.getElementById('lyricsReference').value;
 
             if (!apiKey) return alert('Silakan masukkan Gemini API Key terlebih dahulu.');
             if (!audioFile) return alert('Silakan upload file Audio MP3 terlebih dahulu.');
@@ -477,12 +533,17 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
             renderBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
             try {
-                // Pastikan ukuran canvas sesuai pilihan saat render dimulai
                 updateCanvasDimensions();
+
+                // Reset posisi video jika mode video
+                if (mediaMode === 'video' && bgVideo) {
+                    bgVideo.currentTime = 0;
+                    bgVideo.play();
+                }
 
                 // STEP 1: AI Transkripsi
                 statusText.innerText = "⏳ Membaca & mengompresi audio untuk Gemini AI...";
-                progressBar.style.width = "10%data";
+                progressBar.style.width = "10%";
 
                 const audioEl = document.getElementById('audioElement');
                 audioEl.src = URL.createObjectURL(audioFile);
@@ -511,7 +572,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
 
                     const chunkBuffer = await offlineCtx.startRendering();
                     const wavBlob = await audioBufferToWav8k(chunkBuffer);
-                    const chunkLyrics = await extractLyricsWithGeminiChunk(wavBlob, startTime, apiKey);
+                    const chunkLyrics = await extractLyricsWithGeminiChunk(wavBlob, startTime, apiKey, lyricsRef);
 
                     lyricTimestamps.push(...chunkLyrics);
                 }
@@ -550,7 +611,6 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                 const chosenMime = mp4Types.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
                 const isMp4 = chosenMime.includes('mp4');
 
-                // Ambil batas bitrate dari pilihan UI
                 const targetBitrate = parseInt(document.getElementById('bitrateSetting')?.value || '1500000');
 
                 const recorder = new MediaRecorder(combinedStream, { 
@@ -579,6 +639,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                     renderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 };
 
+                audioEl.currentTime = 0;
                 audioEl.play();
                 recorder.start();
 
