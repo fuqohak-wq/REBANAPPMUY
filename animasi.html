@@ -109,7 +109,7 @@
 
             <!-- Canvas Live Preview -->
             <div>
-                <label class="block text-sm font-semibold text-gray-300 mb-2">📺 Live Preview Canvas:</label>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">📺 Live Preview Canvas (480p Ringan):</label>
                 <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-inner border border-gray-800 flex items-center justify-center">
                     <canvas id="previewCanvas" class="w-full h-full object-contain"></canvas>
                 </div>
@@ -125,15 +125,15 @@
 
             <!-- Action Button -->
             <button id="renderBtn" onclick="startRenderProcess()" class="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold rounded-xl shadow-lg transition flex justify-center items-center gap-2 text-lg">
-                🎬 Proses AI Lirik & Render Video
+                🎬 Proses AI Lirik & Render Video (MP4 Ringan)
             </button>
 
             <!-- Output Preview -->
             <div id="outputArea" class="hidden space-y-4 pt-4 border-t border-gray-800">
-                <h3 class="text-lg font-bold text-gray-200">Hasil Video Animasi Output:</h3>
+                <h3 class="text-lg font-bold text-gray-200">Hasil Video MP4 Ultra Lightweight:</h3>
                 <video id="videoPreview" controls class="w-full rounded-lg shadow-md max-h-[400px] bg-black"></video>
                 <a id="downloadBtn" class="block text-center py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-md transition cursor-pointer">
-                    💾 Download Video (MP4 / WebM)
+                    💾 Download Video (MP4 Format)
                 </a>
             </div>
         </div>
@@ -150,8 +150,10 @@
 
         const canvas = document.getElementById('previewCanvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 1280;
-        canvas.height = 720;
+        
+        // RESOLUSI DIECILKAN KE 854x480 (480p SD - Sangat Ringan & Pas untuk Medsos)
+        canvas.width = 854;
+        canvas.height = 480;
 
         let bgImage = new Image();
         let bgLoaded = false;
@@ -176,13 +178,13 @@
 
         function initParticles() {
             particles = [];
-            const count = 150;
+            const count = 100; // Jumlah partikel dikurangi sedikit agar render cepat
             for (let i = 0; i < count; i++) {
                 particles.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    speed: Math.random() * 8 + 4,
-                    size: Math.random() * 3 + 1,
+                    speed: Math.random() * 6 + 3,
+                    size: Math.random() * 2.5 + 1,
                     alpha: Math.random()
                 });
             }
@@ -210,11 +212,11 @@
             // 3. Render Animated Effects
             if (currentEffect === 'rain' || currentEffect === 'lightning') {
                 ctx.strokeStyle = 'rgba(174, 194, 224, 0.6)';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 1.2;
                 particles.forEach(p => {
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
-                    ctx.lineTo(p.x - 2, p.y + p.speed * 3);
+                    ctx.lineTo(p.x - 2, p.y + p.speed * 2.5);
                     ctx.stroke();
 
                     p.y += p.speed;
@@ -230,7 +232,7 @@
                 particles.forEach(p => {
                     ctx.fillStyle = `rgba(${255}, ${Math.floor(Math.random() * 150)}, 0, ${p.alpha})`;
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, p.size * 1.8, 0, Math.PI * 2);
                     ctx.fill();
 
                     p.y -= p.speed * 0.5;
@@ -254,10 +256,10 @@
                 });
             } else if (currentEffect === 'spectrum' && analyser) {
                 analyser.getByteFrequencyData(dataArray);
-                const barWidth = (canvas.width / dataArray.length) * 2.5;
+                const barWidth = (canvas.width / dataArray.length) * 2.2;
                 let x = 0;
                 for (let i = 0; i < dataArray.length; i++) {
-                    const barHeight = (dataArray[i] / 255) * 250;
+                    const barHeight = (dataArray[i] / 255) * 180;
                     ctx.fillStyle = `hsl(${i * 4}, 100%, 50%)`;
                     ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
                     x += barWidth;
@@ -279,7 +281,7 @@
             const activeLyric = lyricTimestamps.find(l => currentTime >= l.start && currentTime <= l.end);
 
             if (activeLyric && activeLyric.text) {
-                const fontSize = 42;
+                const fontSize = 28; // Disesuaikan dengan Canvas 480p
                 ctx.font = `bold ${fontSize}px ${selectedFont}`;
                 ctx.textAlign = "center";
 
@@ -291,10 +293,10 @@
                 const textWidth = ctx.measureText(text).width;
 
                 ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-                ctx.fillRect(canvas.width / 2 - textWidth / 2 - 20, textY - fontSize + 5, textWidth + 40, fontSize + 20);
+                ctx.fillRect(canvas.width / 2 - textWidth / 2 - 15, textY - fontSize + 4, textWidth + 30, fontSize + 14);
 
                 ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 6;
+                ctx.lineWidth = 4;
                 ctx.strokeText(text, canvas.width / 2, textY);
 
                 ctx.fillStyle = "#facc15";
@@ -304,7 +306,7 @@
 
         drawFrame();
 
-        // --- FUNGSI AI & CHUNKING UTAMA ---
+        // --- FUNGSI AI & CHUNKING ---
 
         async function audioBufferToWav8k(audioBuffer) {
             const targetSampleRate = 8000;
@@ -435,7 +437,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                 const tempAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const decodedAudio = await tempAudioCtx.decodeAudioData(arrayBuffer);
 
-                const chunkSize = 60; // Cut 60s
+                const chunkSize = 60;
                 const totalChunks = Math.ceil(decodedAudio.duration / chunkSize);
                 lyricTimestamps = [];
 
@@ -459,8 +461,8 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                     lyricTimestamps.push(...chunkLyrics);
                 }
 
-                // STEP 2: Render Video
-                statusText.innerText = "📹 Memulai Perekaman Video Animasi...";
+                // STEP 2: Render Video MP4 Low-Bitrate
+                statusText.innerText = "📹 Memulai Perekaman Video MP4 Ringan...";
                 progressBar.style.width = "50%";
 
                 if (!audioCtx) {
@@ -476,23 +478,34 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                 source.connect(dest);
                 source.connect(audioCtx.destination);
 
-                const canvasStream = canvas.captureStream(30);
+                const canvasStream = canvas.captureStream(24); // 24 FPS cukup untuk video lirik & animasi halus
                 const combinedStream = new MediaStream([
                     ...canvasStream.getVideoTracks(),
                     ...dest.stream.getAudioTracks()
                 ]);
 
-                const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp9', 'video/webm'];
-                const chosenMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+                // PILIH FORMAT MP4 TERBAIK
+                const mp4Types = [
+                    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                    'video/mp4;codecs=h264,aac',
+                    'video/mp4',
+                    'video/webm;codecs=vp9', // Fallback jika browser sangat lama tak dukung MP4
+                    'video/webm'
+                ];
+                
+                const chosenMime = mp4Types.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
 
-                const recorder = new MediaRecorder(combinedStream, { mimeType: chosenMime });
+                // SETING BITRATE VIDEO HANYA 1.5 Mbps (Supaya file sangat kecil)
+                const recorder = new MediaRecorder(combinedStream, { 
+                    mimeType: chosenMime,
+                    videoBitsPerSecond: 1500000 // 1.5 Mbps limit
+                });
+
                 const chunks = [];
-
                 recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
                 recorder.onstop = () => {
-                    const isMp4 = chosenMime.includes('mp4');
-                    const blob = new Blob(chunks, { type: chosenMime });
+                    const blob = new Blob(chunks, { type: 'video/mp4' }); // Tetap force tipe blob sebagai MP4
                     const videoUrl = URL.createObjectURL(blob);
 
                     const videoPreview = document.getElementById('videoPreview');
@@ -500,10 +513,10 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
 
                     videoPreview.src = videoUrl;
                     downloadBtn.href = videoUrl;
-                    downloadBtn.download = `Animated-Video-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`;
+                    downloadBtn.download = `Lyric-Video-${Date.now()}.mp4`;
 
                     document.getElementById('outputArea').classList.remove('hidden');
-                    statusText.innerText = "🎉 Video animasi selesai dibuat!";
+                    statusText.innerText = "🎉 Video MP4 ringan berhasil dibuat!";
                     progressBar.style.width = "100%";
                     renderBtn.disabled = false;
                     renderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -515,7 +528,7 @@ Catatan: Akurasikan detik lirik dengan lagu!`;
                 audioEl.ontimeupdate = () => {
                     const progressPercent = 50 + ((audioEl.currentTime / audioEl.duration) * 50);
                     progressBar.style.width = `${progressPercent}%`;
-                    statusText.innerText = `🎬 Merender Video: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
+                    statusText.innerText = `🎬 Merender Video MP4: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
                 };
 
                 audioEl.onended = () => {
