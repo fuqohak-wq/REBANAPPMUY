@@ -146,8 +146,6 @@
 </div>
 
 <script>
-  const CHUNK_DURATION = 25; 
-
   const labelLebar = document.getElementById('labelLebar');
   const labelTegak = document.getElementById('labelTegak');
   const radioInputs = document.querySelectorAll('input[name="aspectRatio"]');
@@ -201,63 +199,52 @@
       progressContainer.style.display = "block";
       previewArea.style.display = "block";
 
-      statusText.innerText = "⏳ Membaca audio & menyelaraskan data...";
-      
+      progressBar.style.width = "20%";
+      statusText.innerText = "⏳ Mengompresi audio untuk dikirim sekaligus ke Gemini 2.5 Flash...";
+
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const arrayBuffer = await audioFile.arrayBuffer();
       const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      
-      const totalDuration = audioBuffer.duration;
-      const totalChunks = Math.ceil(totalDuration / CHUNK_DURATION);
 
-      const lyricLines = rawLyricsText
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l.length > 0 && !l.startsWith('['));
+      // Kompres seluruh audio lagu menjadi 1 file WAV ultra-ringan
+      const compressedBlob = await compressFullAudio(audioBuffer);
+      const base64Audio = await blobToBase64(compressedBlob);
 
-      const linesPerChunk = Math.ceil(lyricLines.length / totalChunks);
-      parsedSubtitles = [];
+      progressBar.style.width = "50%";
+      statusText.innerText = "🤖 Gemini 2.5 Flash sedang menganalisis SELURUH audio & lirik...";
 
-      for (let i = 0; i < totalChunks; i++) {
-        const startSec = i * CHUNK_DURATION;
-        const endSec = Math.min((i + 1) * CHUNK_DURATION, totalDuration);
-        const actualDuration = endSec - startSec;
-        
-        const chunkLyricLines = lyricLines.slice(i * linesPerChunk, (i + 1) * linesPerChunk);
-        const chunkLyricsText = chunkLyricLines.join('\n');
+      // KIRIM HANYA 1 KALI REQUEST KE SERVER!
+      const res = await fetch('/api/transcribe-chunk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioBase64: base64Audio.split(',')[1],
+          mimeType: 'audio/wav',
+          lyrics: rawLyricsText
+        })
+      });
 
-        progressBar.style.width = `${Math.round(((i + 1) / totalChunks) * 50)}%`;
-        statusText.innerText = `🔄 Memproses bagian lirik ${i + 1} dari ${totalChunks} (AI)...`;
-
-        const chunkBlob = await sliceAndCompressAudio(audioBuffer, startSec, endSec);
-        const base64Audio = await blobToBase64(chunkBlob);
-
-        const res = await fetch('/api/transcribe-chunk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audioBase64: base64Audio.split(',')[1],
-            mimeType: 'audio/wav',
-            offsetSeconds: Math.floor(startSec),
-            duration: Math.floor(actualDuration),
-            chunkLyrics: chunkLyricsText
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Gagal pada bagian ${i+1}`);
-        
-        if (data.subtitles && Array.isArray(data.subtitles)) {
-          parsedSubtitles.push(...data.subtitles);
-        }
+      const responseText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Response Server bukan JSON: ${responseText.substring(0, 150)}`);
       }
 
-      console.log("Subtitles Sync Result:", parsedSubtitles);
-      progressBar.style.width = "60%";
+      if (!res.ok) throw new Error(data.error || "Gagal memproses audio di Gemini");
 
-      statusText.innerText = "🎥 Menyiapkan rekaman video...";
+      parsedSubtitles = parseSRT(data.srt || "");
+      console.log("Hasil SRT Utuh dari Gemini 2.5 Flash:", parsedSubtitles);
+
+      if (parsedSubtitles.length === 0) {
+        throw new Error("Gagal membaca timestamp lirik dari AI. Pastikan format lirik benar.");
+      }
+      
+      progressBar.style.width = "80%";
+      statusText.innerText = "🎥 Lirik selesai dicocokkan! Memulai perekaman video MP4...";
+
       initParticles(selectedEffect, canvas.width, canvas.height);
-
       const audioEl = new Audio(URL.createObjectURL(audioFile));
       audioEl.crossOrigin = "anonymous";
 
@@ -286,6 +273,40 @@
       startBtn.disabled = false;
     }
   });
+
+  function parseSRT(srtText) {
+    const subtitles = [];
+    const blocks = srtText.trim().split(/\n\s*\n/);
+
+    for (let block of blocks) {
+      const lines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length >= 2) {
+        let timeLine = lines.find(l => l.includes('-->'));
+        if (timeLine) {
+          const times = timeLine.split('-->').map(t => t.trim());
+          const start = timeToSeconds(times[0]);
+          const end = timeToSeconds(times[1]);
+
+          const textLines = lines.slice(lines.indexOf(timeLine) + 1);
+          const text = textLines.join(' ');
+
+          if (!isNaN(start) && !isNaN(end) && text) {
+            subtitles.push({ start, end, text });
+          }
+        }
+      }
+    }
+    return subtitles;
+  }
+
+  function timeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.replace(',', '.').split(':');
+    if (parts.length === 3) {
+      return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+    }
+    return 0;
+  }
 
   function setupRecorderAndStart(audioEl, mediaEl, type, effect) {
     recordedChunks = [];
@@ -332,7 +353,6 @@
       startBtn.disabled = false;
     };
 
-    // Mulai merekam dulu, baru nyalakan audio agar sinkron dari awal frame
     mediaRecorder.start();
     audioEl.play();
     
@@ -344,11 +364,7 @@
 
   function startAnimationLoop(mediaEl, type, effect, audioEl) {
     function render() {
-      if (type === 'video') {
-        ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
-      }
+      ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
       
       updateAndDrawParticles(effect);
 
@@ -389,14 +405,15 @@
     render();
   }
 
-  async function sliceAndCompressAudio(buffer, startSec, endSec) {
+  // KOMPRESI UTUH 8kHz MONO WAV (Ukuran file < 4MB untuk durasi panjang)
+  async function compressFullAudio(buffer) {
     const targetSampleRate = 8000; 
-    const duration = endSec - startSec;
+    const duration = buffer.duration;
     const offlineCtx = new OfflineAudioContext(1, Math.floor(duration * targetSampleRate), targetSampleRate);
 
     const source = offlineCtx.createBufferSource();
     source.buffer = buffer;
-    source.start(0, startSec, duration);
+    source.start(0);
     source.connect(offlineCtx.destination);
 
     const renderedBuffer = await offlineCtx.startRendering();
