@@ -18,9 +18,9 @@
         <!-- Header & Navigasi Tab -->
         <div class="p-6 text-center border-b border-gray-800">
             <h1 class="text-3xl font-bold text-yellow-400 flex justify-center items-center gap-2">
-                ✨ Animated Music Video Generator
+                ✨ Animated Music Video Generator (AI Powered)
             </h1>
-            <p class="text-gray-400 text-sm mt-1">Sangat Cocok untuk Durasi Singkat hingga Menengah (1 - 15 Menit)</p>
+            <p class="text-gray-400 text-sm mt-1">Lirik Presisi Otomatis dengan Gemini AI + Efek Visual Dynamic</p>
             
             <!-- MENU NAVIGASI PILIHAN EDIT -->
             <div class="mt-6 flex justify-center gap-3 bg-gray-800 p-1.5 rounded-xl border border-gray-700">
@@ -34,6 +34,12 @@
         </div>
 
         <div class="p-6 space-y-6">
+            <!-- API Key Input -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">🔑 Gemini API Key:</label>
+                <input type="password" id="apiKey" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-yellow-500" placeholder="Masukkan Gemini API Key Anda...">
+            </div>
+
             <!-- Upload Options -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -44,12 +50,6 @@
                     <label class="block text-sm font-semibold text-gray-300 mb-2">🖼️ Upload Background Image:</label>
                     <input type="file" id="imageInput" accept="image/*" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400">
                 </div>
-            </div>
-
-            <!-- Input Lirik -->
-            <div>
-                <label class="block text-sm font-semibold text-gray-300 mb-2">📝 Input Lirik & Timestamp (Opsional):</label>
-                <textarea id="lyricsInput" rows="4" class="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none text-sm text-gray-200 placeholder-gray-500" placeholder="Format otomatis atau ketik lirik per baris di sini..."></textarea>
             </div>
 
             <!-- KUSTOMISASI LIRIK (FONT & POSISI) -->
@@ -117,7 +117,7 @@
 
             <!-- Status Area -->
             <div id="statusArea" class="hidden p-4 bg-gray-800 rounded-lg border border-gray-700 text-sm space-y-2">
-                <p id="statusText" class="font-semibold text-yellow-400">Siap merender video...</p>
+                <p id="statusText" class="font-semibold text-yellow-400">Menyiapkan sistem...</p>
                 <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
                     <div id="progressBar" class="bg-yellow-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
@@ -125,7 +125,7 @@
 
             <!-- Action Button -->
             <button id="renderBtn" onclick="startRenderProcess()" class="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold rounded-xl shadow-lg transition flex justify-center items-center gap-2 text-lg">
-                🎬 Render & Rekam Video Animasi
+                🎬 Proses AI Lirik & Render Video
             </button>
 
             <!-- Output Preview -->
@@ -192,7 +192,7 @@
         function drawFrame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Draw Background Image
+            // 1. Background Image
             if (bgLoaded) {
                 const scale = Math.max(canvas.width / bgImage.width, canvas.height / bgImage.height);
                 const imgW = bgImage.width * scale;
@@ -264,7 +264,7 @@
                 }
             }
 
-            // 4. Render Text Lyric (Kustomisasi Font & Posisi)
+            // 4. Render Text Lyric Dynamic
             renderLyricText();
 
             animationId = requestAnimationFrame(drawFrame);
@@ -283,19 +283,16 @@
                 ctx.font = `bold ${fontSize}px ${selectedFont}`;
                 ctx.textAlign = "center";
 
-                // Posisi Vertikal Dynamic
-                let textY = canvas.height * 0.82; // Default: Bawah
+                let textY = canvas.height * 0.82; 
                 if (selectedPos === 'center') textY = canvas.height * 0.5;
                 if (selectedPos === 'top') textY = canvas.height * 0.2;
 
                 const text = activeLyric.text;
                 const textWidth = ctx.measureText(text).width;
 
-                // Background Teks Transparan
                 ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
                 ctx.fillRect(canvas.width / 2 - textWidth / 2 - 20, textY - fontSize + 5, textWidth + 40, fontSize + 20);
 
-                // Outline & Isi Teks
                 ctx.strokeStyle = "#000000";
                 ctx.lineWidth = 6;
                 ctx.strokeText(text, canvas.width / 2, textY);
@@ -307,26 +304,114 @@
 
         drawFrame();
 
-        async function startRenderProcess() {
-            const audioFile = document.getElementById('audioInput').files[0];
-            if (!audioFile) return alert('Silakan upload file Audio MP3 terlebih dahulu.');
+        // --- FUNGSI AI & CHUNKING UTAMA ---
 
-            // Format lirik sederhana berdasarkan baris (opsional)
-            const rawLyrics = document.getElementById('lyricsInput').value.trim().split('\n').filter(l => l.trim() !== '');
-            const audioEl = document.getElementById('audioElement');
-            audioEl.src = URL.createObjectURL(file = audioFile);
+        async function audioBufferToWav8k(audioBuffer) {
+            const targetSampleRate = 8000;
+            const numChannels = 1;
+            const offlineCtx = new OfflineAudioContext(numChannels, Math.ceil(audioBuffer.duration * targetSampleRate), targetSampleRate);
 
-            await new Promise((res) => audioEl.onloadedmetadata = () => res());
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineCtx.destination);
+            source.start(0);
 
-            // Tentukan timestamp otomatis sederhana jika ada lirik manual
-            if (rawLyrics.length > 0) {
-                const step = audioEl.duration / rawLyrics.length;
-                lyricTimestamps = rawLyrics.map((text, i) => ({
-                    text,
-                    start: i * step,
-                    end: (i + 1) * step
-                }));
+            const renderedBuffer = await offlineCtx.startRendering();
+            const pcmData = renderedBuffer.getChannelData(0);
+
+            const wavBuffer = new ArrayBuffer(44 + pcmData.length * 2);
+            const view = new DataView(wavBuffer);
+
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + pcmData.length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, targetSampleRate, true);
+            view.setUint32(28, targetSampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, pcmData.length * 2, true);
+
+            let offset = 44;
+            for (let i = 0; i < pcmData.length; i++) {
+                const s = Math.max(-1, Math.min(1, pcmData[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                offset += 2;
             }
+
+            return new Blob([wavBuffer], { type: 'audio/wav' });
+        }
+
+        async function extractLyricsWithGeminiChunk(audioChunkBlob, chunkStartTime, apiKey) {
+            const base64Audio = await new Promise((res) => {
+                const reader = new FileReader();
+                reader.onloadend = () => res(reader.result.split(',')[1]);
+                reader.readAsDataURL(audioChunkBlob);
+            });
+
+            const promptText = `Transkripsikan lirik lagu dari audio ini lengkap dengan timestamp waktu mulai dan selesai.
+Respons WAJIB berupa JSON ARRAY murni tanpa teks/markdown tambahan:
+[
+  {"text": "Lirik baris pertama", "start": 0.0, "end": 4.5}
+]
+Catatan: Akurasikan detik lirik dengan lagu!`;
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: promptText },
+                        { inline_data: { mime_type: "audio/wav", data: base64Audio } }
+                    ]
+                }]
+            };
+
+            let attempts = 0;
+            while (attempts < 5) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429) {
+                        attempts++;
+                        await new Promise(r => setTimeout(r, 4000 * attempts));
+                        continue;
+                    }
+
+                    const data = await response.json();
+                    let responseText = data.candidates[0].content.parts[0].text;
+                    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+                    const parsed = JSON.parse(responseText);
+                    return parsed.map(item => ({
+                        text: item.text,
+                        start: Number(item.start) + chunkStartTime,
+                        end: Number(item.end) + chunkStartTime
+                    }));
+                } catch (e) {
+                    attempts++;
+                    await new Promise(r => setTimeout(r, 3000));
+                }
+            }
+            return [];
+        }
+
+        async function startRenderProcess() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const audioFile = document.getElementById('audioInput').files[0];
+
+            if (!apiKey) return alert('Silakan masukkan Gemini API Key terlebih dahulu.');
+            if (!audioFile) return alert('Silakan upload file Audio MP3 terlebih dahulu.');
 
             const statusArea = document.getElementById('statusArea');
             const statusText = document.getElementById('statusText');
@@ -337,64 +422,112 @@
             renderBtn.disabled = true;
             renderBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
-            // Setup Audio Context & Analyser
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 128;
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-            }
-            const source = audioCtx.createMediaElementSource(audioEl);
-            const dest = audioCtx.createMediaStreamDestination();
-            source.connect(analyser);
-            source.connect(dest);
-            source.connect(audioCtx.destination);
+            try {
+                // STEP 1: AI Transkripsi
+                statusText.innerText = "⏳ Membaca & mengompresi audio untuk Gemini AI...";
+                progressBar.style.width = "10%";
 
-            const canvasStream = canvas.captureStream(30);
-            const combinedStream = new MediaStream([
-                ...canvasStream.getVideoTracks(),
-                ...dest.stream.getAudioTracks()
-            ]);
+                const audioEl = document.getElementById('audioElement');
+                audioEl.src = URL.createObjectURL(audioFile);
+                await new Promise((res) => audioEl.onloadedmetadata = () => res());
 
-            const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp9', 'video/webm'];
-            const chosenMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+                const arrayBuffer = await audioFile.arrayBuffer();
+                const tempAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const decodedAudio = await tempAudioCtx.decodeAudioData(arrayBuffer);
 
-            const recorder = new MediaRecorder(combinedStream, { mimeType: chosenMime });
-            const chunks = [];
+                const chunkSize = 60; // Cut 60s
+                const totalChunks = Math.ceil(decodedAudio.duration / chunkSize);
+                lyricTimestamps = [];
 
-            recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+                for (let i = 0; i < totalChunks; i++) {
+                    const startTime = i * chunkSize;
+                    const duration = Math.min(chunkSize, decodedAudio.duration - startTime);
 
-            recorder.onstop = () => {
-                const isMp4 = chosenMime.includes('mp4');
-                const blob = new Blob(chunks, { type: chosenMime });
-                const videoUrl = URL.createObjectURL(blob);
+                    statusText.innerText = `🤖 Gemini AI sedang menganalisis lirik (Bagian ${i + 1}/${totalChunks})...`;
+                    progressBar.style.width = `${10 + Math.floor(((i + 1) / totalChunks) * 40)}%`;
 
-                const videoPreview = document.getElementById('videoPreview');
-                const downloadBtn = document.getElementById('downloadBtn');
+                    const offlineCtx = new OfflineAudioContext(decodedAudio.numberOfChannels, Math.ceil(duration * decodedAudio.sampleRate), decodedAudio.sampleRate);
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = decodedAudio;
+                    source.connect(offlineCtx.destination);
+                    source.start(0, startTime, duration);
 
-                videoPreview.src = videoUrl;
-                downloadBtn.href = videoUrl;
-                downloadBtn.download = `Animated-Video-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`;
+                    const chunkBuffer = await offlineCtx.startRendering();
+                    const wavBlob = await audioBufferToWav8k(chunkBuffer);
+                    const chunkLyrics = await extractLyricsWithGeminiChunk(wavBlob, startTime, apiKey);
 
-                document.getElementById('outputArea').classList.remove('hidden');
-                statusText.innerText = "🎉 Video animasi selesai dibuat!";
-                progressBar.style.width = "100%";
+                    lyricTimestamps.push(...chunkLyrics);
+                }
+
+                // STEP 2: Render Video
+                statusText.innerText = "📹 Memulai Perekaman Video Animasi...";
+                progressBar.style.width = "50%";
+
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 128;
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                }
+                
+                const source = audioCtx.createMediaElementSource(audioEl);
+                const dest = audioCtx.createMediaStreamDestination();
+                source.connect(analyser);
+                source.connect(dest);
+                source.connect(audioCtx.destination);
+
+                const canvasStream = canvas.captureStream(30);
+                const combinedStream = new MediaStream([
+                    ...canvasStream.getVideoTracks(),
+                    ...dest.stream.getAudioTracks()
+                ]);
+
+                const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/webm;codecs=vp9', 'video/webm'];
+                const chosenMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+
+                const recorder = new MediaRecorder(combinedStream, { mimeType: chosenMime });
+                const chunks = [];
+
+                recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+                recorder.onstop = () => {
+                    const isMp4 = chosenMime.includes('mp4');
+                    const blob = new Blob(chunks, { type: chosenMime });
+                    const videoUrl = URL.createObjectURL(blob);
+
+                    const videoPreview = document.getElementById('videoPreview');
+                    const downloadBtn = document.getElementById('downloadBtn');
+
+                    videoPreview.src = videoUrl;
+                    downloadBtn.href = videoUrl;
+                    downloadBtn.download = `Animated-Video-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`;
+
+                    document.getElementById('outputArea').classList.remove('hidden');
+                    statusText.innerText = "🎉 Video animasi selesai dibuat!";
+                    progressBar.style.width = "100%";
+                    renderBtn.disabled = false;
+                    renderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                };
+
+                audioEl.play();
+                recorder.start();
+
+                audioEl.ontimeupdate = () => {
+                    const progressPercent = 50 + ((audioEl.currentTime / audioEl.duration) * 50);
+                    progressBar.style.width = `${progressPercent}%`;
+                    statusText.innerText = `🎬 Merender Video: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
+                };
+
+                audioEl.onended = () => {
+                    recorder.stop();
+                };
+
+            } catch (err) {
+                console.error(err);
+                alert("Terjadi kesalahan: " + err.message);
                 renderBtn.disabled = false;
                 renderBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            };
-
-            audioEl.play();
-            recorder.start();
-
-            audioEl.ontimeupdate = () => {
-                const progressPercent = (audioEl.currentTime / audioEl.duration) * 100;
-                progressBar.style.width = `${progressPercent}%`;
-                statusText.innerText = `📹 Merender Video Animasi: ${Math.floor(audioEl.currentTime)}s / ${Math.floor(audioEl.duration)}s`;
-            };
-
-            audioEl.onended = () => {
-                recorder.stop();
-            };
+            }
         }
     </script>
 </body>
