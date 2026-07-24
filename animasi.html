@@ -46,6 +46,42 @@
                 </div>
             </div>
 
+            <!-- Input Lirik -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">📝 Input Lirik & Timestamp (Opsional):</label>
+                <textarea id="lyricsInput" rows="4" class="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none text-sm text-gray-200 placeholder-gray-500" placeholder="Format otomatis atau ketik lirik per baris di sini..."></textarea>
+            </div>
+
+            <!-- KUSTOMISASI LIRIK (FONT & POSISI) -->
+            <div class="bg-gray-800/80 p-4 rounded-xl border border-gray-700 space-y-3">
+                <h3 class="text-sm font-semibold text-yellow-400 flex items-center gap-2">
+                    ⚙️ Kustomisasi Tampilan Lirik
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Gaya Font -->
+                    <div>
+                        <label class="block text-xs text-gray-300 mb-1">Gaya Font Teks:</label>
+                        <select id="fontFamily" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-yellow-500">
+                            <option value="sans-serif">Sans-Serif (Modern / Bersih)</option>
+                            <option value="serif">Serif (Klasik / Elegan)</option>
+                            <option value="monospace">Monospace (Ketik / Retro)</option>
+                            <option value="Impact">Impact (Bold / Tegas)</option>
+                            <option value="Trebuchet MS">Trebuchet MS (Casual)</option>
+                        </select>
+                    </div>
+
+                    <!-- Posisi Vertikal -->
+                    <div>
+                        <label class="block text-xs text-gray-300 mb-1">Posisi Teks (Vertikal):</label>
+                        <select id="textPosition" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:border-yellow-500">
+                            <option value="bottom">Bawah (Default)</option>
+                            <option value="center">Tengah (Center)</option>
+                            <option value="top">Atas (Top)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <!-- Pilih Efek Animasi -->
             <div>
                 <label class="block text-sm font-semibold text-gray-300 mb-2">🎨 Pilih Efek Animasi Dynamic:</label>
@@ -110,6 +146,7 @@
         let animationId = null;
         let particles = [];
         let audioCtx, analyser, dataArray;
+        let lyricTimestamps = [];
 
         const canvas = document.getElementById('previewCanvas');
         const ctx = canvas.getContext('2d');
@@ -119,7 +156,7 @@
         let bgImage = new Image();
         let bgLoaded = false;
 
-        // Event listener saat unggah gambar
+        // Upload Background
         document.getElementById('imageInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -155,7 +192,7 @@
         function drawFrame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Background Image
+            // 1. Draw Background Image
             if (bgLoaded) {
                 const scale = Math.max(canvas.width / bgImage.width, canvas.height / bgImage.height);
                 const imgW = bgImage.width * scale;
@@ -166,11 +203,11 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
-            // Draw Dark Overlay
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            // 2. Dark Overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Render Animated Effects
+            // 3. Render Animated Effects
             if (currentEffect === 'rain' || currentEffect === 'lightning') {
                 ctx.strokeStyle = 'rgba(174, 194, 224, 0.6)';
                 ctx.lineWidth = 1.5;
@@ -227,7 +264,45 @@
                 }
             }
 
+            // 4. Render Text Lyric (Kustomisasi Font & Posisi)
+            renderLyricText();
+
             animationId = requestAnimationFrame(drawFrame);
+        }
+
+        function renderLyricText() {
+            const selectedFont = document.getElementById('fontFamily').value;
+            const selectedPos = document.getElementById('textPosition').value;
+            const audioEl = document.getElementById('audioElement');
+            const currentTime = audioEl ? audioEl.currentTime : 0;
+
+            const activeLyric = lyricTimestamps.find(l => currentTime >= l.start && currentTime <= l.end);
+
+            if (activeLyric && activeLyric.text) {
+                const fontSize = 42;
+                ctx.font = `bold ${fontSize}px ${selectedFont}`;
+                ctx.textAlign = "center";
+
+                // Posisi Vertikal Dynamic
+                let textY = canvas.height * 0.82; // Default: Bawah
+                if (selectedPos === 'center') textY = canvas.height * 0.5;
+                if (selectedPos === 'top') textY = canvas.height * 0.2;
+
+                const text = activeLyric.text;
+                const textWidth = ctx.measureText(text).width;
+
+                // Background Teks Transparan
+                ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+                ctx.fillRect(canvas.width / 2 - textWidth / 2 - 20, textY - fontSize + 5, textWidth + 40, fontSize + 20);
+
+                // Outline & Isi Teks
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 6;
+                ctx.strokeText(text, canvas.width / 2, textY);
+
+                ctx.fillStyle = "#facc15";
+                ctx.fillText(text, canvas.width / 2, textY);
+            }
         }
 
         drawFrame();
@@ -236,8 +311,22 @@
             const audioFile = document.getElementById('audioInput').files[0];
             if (!audioFile) return alert('Silakan upload file Audio MP3 terlebih dahulu.');
 
+            // Format lirik sederhana berdasarkan baris (opsional)
+            const rawLyrics = document.getElementById('lyricsInput').value.trim().split('\n').filter(l => l.trim() !== '');
             const audioEl = document.getElementById('audioElement');
-            audioEl.src = URL.createObjectURL(audioFile);
+            audioEl.src = URL.createObjectURL(file = audioFile);
+
+            await new Promise((res) => audioEl.onloadedmetadata = () => res());
+
+            // Tentukan timestamp otomatis sederhana jika ada lirik manual
+            if (rawLyrics.length > 0) {
+                const step = audioEl.duration / rawLyrics.length;
+                lyricTimestamps = rawLyrics.map((text, i) => ({
+                    text,
+                    start: i * step,
+                    end: (i + 1) * step
+                }));
+            }
 
             const statusArea = document.getElementById('statusArea');
             const statusText = document.getElementById('statusText');
@@ -248,9 +337,7 @@
             renderBtn.disabled = true;
             renderBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
-            await new Promise((res) => audioEl.onloadedmetadata = () => res());
-
-            // Setup Audio Context & Analyser untuk efek Spectrum
+            // Setup Audio Context & Analyser
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioCtx.createAnalyser();
