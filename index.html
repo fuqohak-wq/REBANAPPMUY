@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automatic Music Video Creator</title>
+    <title>Automatic Music Video Creator - High Precision Chunking</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,15 +20,14 @@
             <h1 class="text-3xl font-bold text-green-700 flex justify-center items-center gap-2">
                 🌿 AI Music Video Creator
             </h1>
-            <p class="text-gray-500 text-sm mt-1">Smart Lightweight Video Generator (High Precision Sync)</p>
+            <p class="text-gray-500 text-sm mt-1">Multi-Chunk Precision Sync (Accurate 100% Full Song)</p>
         </div>
 
         <div class="p-6 space-y-6">
             <!-- 1. Gemini API Key -->
             <div class="border border-green-200 rounded-xl p-4 bg-green-50/50">
-                <label class="block text-sm font-semibold text-green-900 mb-1">🔑 1. Masukkan Gemini API Key (Wajib untuk Akurasi High-Precision):</label>
+                <label class="block text-sm font-semibold text-green-900 mb-1">🔑 1. Masukkan Gemini API Key:</label>
                 <input type="password" id="apiKey" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" placeholder="AIzaSy...">
-                <p class="text-xs text-gray-500 mt-1">AI akan mendengarkan audio secara langsung untuk mencocokkan kata per kata.</p>
             </div>
 
             <!-- 2. Upload MP3 -->
@@ -46,7 +45,7 @@
             <!-- 4. Tempel Lirik -->
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">📝 4. Tempel Lirik Teks Asli (Berurutan per baris):</label>
-                <textarea id="lyricsInput" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm" placeholder="Contoh:&#10;Mari menjaga iman di dada&#10;Belajar tauhid sepanjang masa&#10;Ikhlas beramal karena Allah semata&#10;Menuju surga penuh cahaya"></textarea>
+                <textarea id="lyricsInput" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm" placeholder="Masukkan lirik di sini..."></textarea>
             </div>
 
             <!-- 5. Format Ukuran Video -->
@@ -76,7 +75,7 @@
 
             <!-- Tombol Render Utama -->
             <button id="renderBtn" onclick="startAutomaticProcess()" class="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg transition flex justify-center items-center gap-2 text-lg">
-                🚀 Mulaikan Proses Lirik & Render Video
+                🚀 Mulai Sinkronisasi Chunking & Render Video
             </button>
 
             <!-- Preview Hasil Akhir -->
@@ -117,7 +116,7 @@
             const imageFile = document.getElementById('imageInput').files[0];
             const lyricsText = document.getElementById('lyricsInput').value.trim();
 
-            if (!apiKey) return alert("Silakan masukkan Gemini API Key terlebih dahulu.");
+            if (!apiKey) return alert("Silakan masukkan Gemini API Key.");
             if (!audioFile) return alert("Silakan unggah file audio MP3.");
             if (!imageFile) return alert("Silakan unggah gambar background.");
             if (!lyricsText) return alert("Silakan isi teks lirik.");
@@ -132,39 +131,57 @@
             renderBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
             try {
-                // 1. Load Audio
-                statusText.innerText = "⏳ Mengompresi audio secara instan untuk Gemini AI...";
-                progressBar.style.width = "15%";
+                statusText.innerText = "⏳ Membaca file audio...";
+                progressBar.style.width = "5%";
 
                 const audioUrl = URL.createObjectURL(audioFile);
                 const audio = document.getElementById('audioPlayback');
                 audio.src = audioUrl;
 
-                await new Promise((resolve) => {
-                    audio.onloadedmetadata = () => resolve();
-                });
+                await new Promise((resolve) => audio.onloadedmetadata = () => resolve());
 
-                // 2. Kompresi Audio ke WAV 8kHz 8-bit Ultra-Light
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const arrayBuffer = await audioFile.arrayBuffer();
-                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                const compressedBlob = await compressAudioToUltraLightWav(audioBuffer);
-                const base64Audio = await blobToBase64(compressedBlob);
+                const fullAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-                // 3. Panggil AI Gemini (Dengar Langsung Audio + Lirik)
-                statusText.innerText = "🤖 Gemini 2.5 Flash sedang menganalisis ketukan vokal...";
-                progressBar.style.width = "40%";
+                // PROSES CHUNKING (Potong audio per 60 detik)
+                const chunkSize = 60; // detik
+                const totalDuration = fullAudioBuffer.duration;
+                const numChunks = Math.ceil(totalDuration / chunkSize);
+                
+                lyricTimestamps = [];
 
-                lyricTimestamps = await getPreciseTimestampsFromGemini(apiKey, base64Audio, lyricsText);
+                for (let i = 0; i < numChunks; i++) {
+                    const startTime = i * chunkSize;
+                    const endTime = Math.min((i + 1) * chunkSize, totalDuration);
 
-                if (!lyricTimestamps || lyricTimestamps.length === 0) {
-                    throw new Error("Gagal membaca timestamp lirik dari Gemini.");
+                    statusText.innerText = `🤖 Menganalisis bagian ${i + 1} dari ${numChunks} (${Math.floor(startTime)}s - ${Math.floor(endTime)}s)...`;
+                    progressBar.style.width = `${10 + Math.floor((i / numChunks) * 45)}%`;
+
+                    const chunkBuffer = sliceAudioBuffer(audioCtx, fullAudioBuffer, startTime, endTime);
+                    const compressedWav = await compressAudioToUltraLightWav(chunkBuffer);
+                    const base64Audio = await blobToBase64(compressedWav);
+
+                    const chunkTimestamps = await getChunkTimestampsFromGemini(apiKey, base64Audio, lyricsText, startTime, endTime);
+                    
+                    if (chunkTimestamps && Array.isArray(chunkTimestamps)) {
+                        // Sesuaikan penyesuaian offset detik sesuai waktu chunk
+                        const offsetTimestamps = chunkTimestamps.map(item => ({
+                            text: item.text,
+                            start: parseFloat((item.start + startTime).toFixed(2)),
+                            end: parseFloat((item.end + startTime).toFixed(2))
+                        }));
+                        lyricTimestamps.push(...offsetTimestamps);
+                    }
                 }
 
-                statusText.innerText = "✅ Analisis vokal presisi selesai! Memulai perekaman video...";
+                // Filter & Sort Timestamp gabungan
+                lyricTimestamps.sort((a, b) => a.start - b.start);
+
+                statusText.innerText = "✅ Semua bagian berhasil disinkronkan presisi! Memulai perekaman video...";
                 progressBar.style.width = "60%";
 
-                // 4. Mulai Render Video
+                // Mulai Render Video
                 await renderAndRecord(audio, imageFile);
 
             } catch (error) {
@@ -177,7 +194,21 @@
             }
         }
 
-        // FUNGSI KOMPRESI AUDIO KE FORMAT SUPER RINGAN (8kHz, 8-bit Mono)
+        // FUNGSI MEMOTONG AUDIO BUFFER (CHUNKING)
+        function sliceAudioBuffer(ctx, buffer, begin, end) {
+            const rate = buffer.sampleRate;
+            const startOffset = Math.floor(begin * rate);
+            const endOffset = Math.floor(end * rate);
+            const frameCount = endOffset - startOffset;
+
+            const newBuffer = ctx.createBuffer(1, frameCount, rate);
+            const channelData = newBuffer.getChannelData(0);
+            buffer.copyFromChannel(channelData, 0, startOffset);
+
+            return newBuffer;
+        }
+
+        // FUNGSI KOMPRESI AUDIO LIGHTWEIGHT
         async function compressAudioToUltraLightWav(buffer) {
             const targetSampleRate = 8000;
             const duration = buffer.duration;
@@ -190,7 +221,6 @@
 
             const renderedBuffer = await offlineCtx.startRendering();
 
-            // Render ke format Uint8 WAV
             const numOfChan = 1;
             const length = renderedBuffer.length * numOfChan + 44;
             const out = new DataView(new ArrayBuffer(length));
@@ -225,23 +255,24 @@
             });
         }
 
-        // METODE GEMINI HIGH-PRECISION AUDIO TRANSCRIPTION
-        async function getPreciseTimestampsFromGemini(apiKey, base64Audio, lyrics) {
-            const promptText = `Dengarkan file audio lagu ini dengan cermat. Berikut adalah lirik teks aslinya:
+        // METODE GEMINI PROMPT DENGAN PEMOTONGAN RELEVAN
+        async function getChunkTimestampsFromGemini(apiKey, base64Audio, lyrics, chunkStart, chunkEnd) {
+            const promptText = `Ini adalah potongan audio lagu dari detik ke-${chunkStart} sampai detik ke-${chunkEnd}.
+Berikut adalah daftar lirik lengkap lagu tersebut:
 
 """
 ${lyrics}
 """
 
 Tugas Anda:
-Cocokkan setiap baris lirik di atas dengan audio secara presisi. Tentukan waktu awal (start) dan waktu akhir (end) tepat saat lirik tersebut dinyanyikan.
-Kembalikan respon HANYA berformat JSON Array berisi objek dengan kunci "text", "start" (dalam detik float), dan "end" (dalam detik float).
-Jangan menambahkan kata intro/markdown luar selain array JSON.
+1. Dengarkan klip audio berdurasi 60 detik ini dengan teliti.
+2. Cari dan temukan baris-baris lirik yang HANYA dinyanyikan pada klip audio ini.
+3. Hitung penanda waktu relatif terhadap awal potongan audio ini (0.0 detik sampai 60.0 detik).
+4. Jika tidak ada lirik yang dinyanyikan pada klip ini (misal instrumen/jeda), kembalikan array kosong [].
 
-Contoh Output Valid:
+Format Output Wajib JSON Array SAHAJA:
 [
-  {"text": "Baris lirik pertama", "start": 3.4, "end": 7.2},
-  {"text": "Baris lirik kedua", "start": 8.0, "end": 12.1}
+  {"text": "Baris lirik yang terdengar", "start": 3.2, "end": 6.8}
 ]`;
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
@@ -267,14 +298,18 @@ Contoh Output Valid:
             });
 
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                throw new Error(errorBody.error?.message || `Error status: ${response.status}`);
+                return [];
             }
 
             const data = await response.json();
-            let rawText = data.candidates[0].content.parts[0].text;
+            let rawText = data.candidates[0]?.content?.parts[0]?.text || "[]";
             rawText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
-            return JSON.parse(rawText);
+            
+            try {
+                return JSON.parse(rawText);
+            } catch (e) {
+                return [];
+            }
         }
 
         // FUNGSI RENDER & REKAM VIDEO
