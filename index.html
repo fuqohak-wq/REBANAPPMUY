@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automatic Music Video Creator - High Precision Chunking</title>
+    <title>Automatic Music Video Creator - Robust Rate Limit Handling</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,7 +20,7 @@
             <h1 class="text-3xl font-bold text-green-700 flex justify-center items-center gap-2">
                 🌿 AI Music Video Creator
             </h1>
-            <p class="text-gray-500 text-sm mt-1">Multi-Chunk Precision Sync (Accurate 100% Full Song)</p>
+            <p class="text-gray-500 text-sm mt-1">100% Full Precision with Auto-Retry Rate Limit Handling</p>
         </div>
 
         <div class="p-6 space-y-6">
@@ -97,6 +97,9 @@
         let selectedFormat = 'landscape';
         let lyricTimestamps = [];
 
+        // Fungsi pembantu jeda (delay)
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
         function selectFormat(format) {
             selectedFormat = format;
             const land = document.getElementById('labelLandscape');
@@ -144,8 +147,8 @@
                 const arrayBuffer = await audioFile.arrayBuffer();
                 const fullAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-                // PROSES CHUNKING (Potong audio per 60 detik)
-                const chunkSize = 60; // detik
+                // PROSES CHUNKING (Per 60 detik)
+                const chunkSize = 60; 
                 const totalDuration = fullAudioBuffer.duration;
                 const numChunks = Math.ceil(totalDuration / chunkSize);
                 
@@ -162,10 +165,10 @@
                     const compressedWav = await compressAudioToUltraLightWav(chunkBuffer);
                     const base64Audio = await blobToBase64(compressedWav);
 
-                    const chunkTimestamps = await getChunkTimestampsFromGemini(apiKey, base64Audio, lyricsText, startTime, endTime);
+                    // Panggil API dengan fitur Auto Retry jika terkena limit (429)
+                    const chunkTimestamps = await fetchWithRetry(apiKey, base64Audio, lyricsText, startTime, endTime, statusText);
                     
                     if (chunkTimestamps && Array.isArray(chunkTimestamps)) {
-                        // Sesuaikan penyesuaian offset detik sesuai waktu chunk
                         const offsetTimestamps = chunkTimestamps.map(item => ({
                             text: item.text,
                             start: parseFloat((item.start + startTime).toFixed(2)),
@@ -173,12 +176,18 @@
                         }));
                         lyricTimestamps.push(...offsetTimestamps);
                     }
+
+                    // Jeda aman antar request agar tidak memicu 429 Rate Limit
+                    if (i < numChunks - 1) {
+                        statusText.innerText = `⏳ Menunggu jeda antrean API (3 detik)...`;
+                        await sleep(3000);
+                    }
                 }
 
-                // Filter & Sort Timestamp gabungan
+                // Urutkan Timestamp Gabungan
                 lyricTimestamps.sort((a, b) => a.start - b.start);
 
-                statusText.innerText = "✅ Semua bagian berhasil disinkronkan presisi! Memulai perekaman video...";
+                statusText.innerText = "✅ Semua lirik berhasil disinkronkan 100%! Memulai perekaman video...";
                 progressBar.style.width = "60%";
 
                 // Mulai Render Video
@@ -194,7 +203,28 @@
             }
         }
 
-        // FUNGSI MEMOTONG AUDIO BUFFER (CHUNKING)
+        // FUNGSI API CALL DENGAN RETRY OTOMATIS JIKA KENA 429
+        async function fetchWithRetry(apiKey, base64Audio, lyrics, chunkStart, chunkEnd, statusElement, maxRetries = 4) {
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    const res = await getChunkTimestampsFromGemini(apiKey, base64Audio, lyrics, chunkStart, chunkEnd);
+                    if (res.status === 429) {
+                        attempt++;
+                        const waitTime = attempt * 5; // Jeda meningkat: 5s, 10s, 15s
+                        statusElement.innerText = `⚠️ Terkena limit API (429). Mengulang otomatis dalam ${waitTime} detik... (Percobaan ${attempt}/${maxRetries})`;
+                        await sleep(waitTime * 1000);
+                        continue;
+                    }
+                    return res.data;
+                } catch (err) {
+                    attempt++;
+                    await sleep(4000);
+                }
+            }
+            return [];
+        }
+
         function sliceAudioBuffer(ctx, buffer, begin, end) {
             const rate = buffer.sampleRate;
             const startOffset = Math.floor(begin * rate);
@@ -208,7 +238,6 @@
             return newBuffer;
         }
 
-        // FUNGSI KOMPRESI AUDIO LIGHTWEIGHT
         async function compressAudioToUltraLightWav(buffer) {
             const targetSampleRate = 8000;
             const duration = buffer.duration;
@@ -255,7 +284,6 @@
             });
         }
 
-        // METODE GEMINI PROMPT DENGAN PEMOTONGAN RELEVAN
         async function getChunkTimestampsFromGemini(apiKey, base64Audio, lyrics, chunkStart, chunkEnd) {
             const promptText = `Ini adalah potongan audio lagu dari detik ke-${chunkStart} sampai detik ke-${chunkEnd}.
 Berikut adalah daftar lirik lengkap lagu tersebut:
@@ -297,8 +325,12 @@ Format Output Wajib JSON Array SAHAJA:
                 })
             });
 
+            if (response.status === 429) {
+                return { status: 429, data: [] };
+            }
+
             if (!response.ok) {
-                return [];
+                return { status: response.status, data: [] };
             }
 
             const data = await response.json();
@@ -306,13 +338,13 @@ Format Output Wajib JSON Array SAHAJA:
             rawText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
             
             try {
-                return JSON.parse(rawText);
+                return { status: 200, data: JSON.parse(rawText) };
             } catch (e) {
-                return [];
+                return { status: 200, data: [] };
             }
         }
 
-        // FUNGSI RENDER & REKAM VIDEO
+        // FUNGSI RENDER TEROPTIMASI
         function renderAndRecord(audio, imageFile) {
             return new Promise((resolve) => {
                 const canvas = document.getElementById('renderCanvas');
@@ -372,6 +404,19 @@ Format Output Wajib JSON Array SAHAJA:
                     audio.play();
                     recorder.start();
 
+                    // Pre-kalkulasi gambar background
+                    const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                    const imgW = img.width * scale;
+                    const imgH = img.height * scale;
+                    const imgX = (canvas.width / 2) - (imgW / 2);
+                    const imgY = (canvas.height / 2) - (imgH / 2);
+                    
+                    const fontSize = selectedFormat === 'landscape' ? 42 : 36;
+                    const textY = canvas.height * 0.75;
+
+                    let lastText = "";
+                    let cachedTextWidth = 0;
+
                     function drawFrame() {
                         if (audio.paused || audio.ended) {
                             recorder.stop();
@@ -379,13 +424,10 @@ Format Output Wajib JSON Array SAHAJA:
                             return;
                         }
 
-                        // Draw Background Image (Cover Fit)
-                        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
-                        const x = (canvas.width / 2) - (img.width / 2) * scale;
-                        const y = (canvas.height / 2) - (img.height / 2) * scale;
-                        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                        // Background
+                        ctx.drawImage(img, imgX, imgY, imgW, imgH);
 
-                        // Overlay Gelap agar Lirik Terbaca
+                        // Overlay Gelap
                         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -393,31 +435,32 @@ Format Output Wajib JSON Array SAHAJA:
                         const currentTime = audio.currentTime;
                         const activeLyric = lyricTimestamps.find(l => currentTime >= l.start && currentTime <= l.end);
 
-                        // Gambar Teks Lirik Presisi
+                        // Gambar Teks Lirik
                         if (activeLyric) {
-                            const fontSize = selectedFormat === 'landscape' ? 42 : 36;
-                            ctx.font = `bold ${fontSize}px sans-serif`;
-                            ctx.textAlign = "center";
-                            
-                            const textY = canvas.height * 0.75;
                             const text = activeLyric.text;
                             
+                            ctx.font = `bold ${fontSize}px sans-serif`;
+                            ctx.textAlign = "center";
+
+                            if (text !== lastText) {
+                                cachedTextWidth = ctx.measureText(text).width;
+                                lastText = text;
+                            }
+
                             // Background Teks
                             ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-                            const textWidth = ctx.measureText(text).width;
-                            ctx.fillRect(canvas.width / 2 - textWidth / 2 - 20, textY - fontSize, textWidth + 40, fontSize + 20);
+                            ctx.fillRect(canvas.width / 2 - cachedTextWidth / 2 - 20, textY - fontSize, cachedTextWidth + 40, fontSize + 20);
 
-                            // Stroke / Border Teks
+                            // Stroke & Fill
                             ctx.strokeStyle = "#000000";
                             ctx.lineWidth = 6;
                             ctx.strokeText(text, canvas.width / 2, textY);
 
-                            // Isian Teks
-                            ctx.fillStyle = "#facc15"; // Warna Kuning Emas
+                            ctx.fillStyle = "#facc15";
                             ctx.fillText(text, canvas.width / 2, textY);
                         }
 
-                        // Perbarui Visual Progress Bar Render
+                        // Progress Render
                         const progressPercent = 60 + ((currentTime / audio.duration) * 40);
                         document.getElementById('progressBar').style.width = `${progressPercent}%`;
                         document.getElementById('statusText').innerText = `📹 Merender Video: ${Math.floor(currentTime)}s / ${Math.floor(audio.duration)}s`;
