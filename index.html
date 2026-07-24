@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Video Creator</title>
+    <!-- Tailwind CSS untuk Desain Interface -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #f0fdf4 0%, #e8f5e9 100%);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen py-10 px-4 font-sans text-gray-800">
+
+    <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl border border-green-100 overflow-hidden">
+        <!-- Header -->
+        <div class="p-6 text-center border-b border-gray-100">
+            <h1 class="text-3xl font-bold text-green-700 flex justify-center items-center gap-2">
+                🌱 AI Music Video Creator
+            </h1>
+            <p class="text-gray-500 text-sm mt-1">Smart Lightweight Video Generator</p>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- API Key Input (Untuk Keamanan) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key:</label>
+                <input type="password" id="apiKey" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none" placeholder="Masukkan Gemini API Key Anda">
+            </div>
+
+            <!-- 1. Upload MP3 -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">🎵 1. Upload File Audio MP3:</label>
+                <input type="file" id="audioInput" accept="audio/mp3" class="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+            </div>
+
+            <!-- 2. Upload Gambar -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">🖼️ 2. Upload Gambar Background:</label>
+                <input type="file" id="imageInput" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+            </div>
+
+            <!-- 3. Tempel Lirik -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">📝 3. Tempel Lirik Teks Asli (Berurutan per baris):</label>
+                <textarea id="lyricsInput" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm" placeholder="Contoh:&#10;Mari menjaga iman di dada&#10;Belajar tauhid sepanjang masa"></textarea>
+            </div>
+
+            <!-- 4. Format Ukuran Video -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">📐 4. Format Ukuran Video Output:</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="border-2 border-green-500 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-green-50 transition" id="labelLandscape">
+                        <input type="radio" name="videoFormat" value="landscape" checked class="sr-only" onclick="selectFormat('landscape')">
+                        <span class="text-lg">🖥️ Lebar (16:9)</span>
+                        <span class="text-xs text-gray-500">YouTube / Desktop</span>
+                    </label>
+                    <label class="border border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition" id="labelPortrait">
+                        <input type="radio" name="videoFormat" value="portrait" class="sr-only" onclick="selectFormat('portrait')">
+                        <span class="text-lg">📱 Tegak (9:16)</span>
+                        <span class="text-xs text-gray-500">Shorts / Reels / TikTok</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Progress & Status -->
+            <div id="statusArea" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-600 space-y-2">
+                <p id="statusText" class="font-semibold text-green-700">Menunggu proses...</p>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progressBar" class="bg-green-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Tombol Render -->
+            <button id="renderBtn" onclick="startProcess()" class="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg transition flex justify-center items-center gap-2">
+                🚀 Mulaikan Proses Lirik & Render Video
+            </button>
+
+            <!-- Preview Hasil Video -->
+            <div id="outputArea" class="hidden space-y-4">
+                <h3 class="text-lg font-bold text-gray-700">Hasil Video:</h3>
+                <video id="videoPreview" controls class="w-full rounded-lg shadow-md max-h-[400px] bg-black"></video>
+                <a id="downloadBtn" class="block text-center py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition">
+                    ⬇️ Download Video (MP4/WebM)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Canvas & Audio Elements untuk Proses di Balik Layar -->
+    <canvas id="renderCanvas" class="hidden"></canvas>
+    <audio id="audioPlayback" class="hidden"></audio>
+
+    <script>
+        let selectedFormat = 'landscape';
+        let lyricTimestamps = [];
+
+        function selectFormat(format) {
+            selectedFormat = format;
+            const land = document.getElementById('labelLandscape');
+            const port = document.getElementById('labelPortrait');
+            if (format === 'landscape') {
+                land.className = "border-2 border-green-500 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-green-50 transition";
+                port.className = "border border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition";
+            } else {
+                port.className = "border-2 border-green-500 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-green-50 transition";
+                land.className = "border border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition";
+            }
+        }
+
+        async function startProcess() {
+            const apiKey = document.getElementById('apiKey').value;
+            const audioFile = document.getElementById('audioInput').files[0];
+            const imageFile = document.getElementById('imageInput').files[0];
+            const lyricsText = document.getElementById('lyricsInput').value;
+
+            if (!apiKey) return alert("Silakan masukkan Gemini API Key terlebih dahulu.");
+            if (!audioFile) return alert("Silakan unggah file audio MP3.");
+            if (!imageFile) return alert("Silakan unggah gambar background.");
+            if (!lyricsText.trim()) return alert("Silakan isi teks lirik.");
+
+            const statusArea = document.getElementById('statusArea');
+            const statusText = document.getElementById('statusText');
+            const progressBar = document.getElementById('progressBar');
+            statusArea.classList.remove('hidden');
+
+            try {
+                // 1. Load Audio untuk mendapatkan durasi asli
+                statusText.innerText = "Membaca durasi audio...";
+                const audioUrl = URL.createObjectURL(audioFile);
+                const audio = document.getElementById('audioPlayback');
+                audio.src = audioUrl;
+                
+                await new Promise((resolve) => {
+                    audio.onloadedmetadata = () => resolve();
+                });
+                const duration = audio.duration;
+
+                // 2. Minta bantuan Gemini AI untuk membagi durasi lirik
+                statusText.innerText = "Menghubungkan ke Gemini AI untuk sinkronisasi lirik...";
+                progressBar.style.width = "25%";
+                lyricTimestamps = await getTimestampsFromGemini(apiKey, lyricsText, duration);
+
+                if (!lyricTimestamps || lyricTimestamps.length === 0) {
+                    throw new Error("Gagal mendapatkan sinkronisasi lirik dari AI.");
+                }
+
+                // 3. Mulai Render dan Rekam Video
+                statusText.innerText = "Memulai proses rendering video (mohon tunggu hingga lagu selesai diputar)...";
+                progressBar.style.width = "50%";
+                await renderAndRecord(audio, imageFile);
+
+            } catch (error) {
+                console.error(error);
+                statusText.innerText = "Terjadi kesalahan: " + error.message;
+                statusText.classList.add('text-red-600');
+            }
+        }
+
+        async function getTimestampsFromGemini(apiKey, lyrics, duration) {
+            const prompt = `Anda adalah asisten pembuat video musik. Saya memiliki lagu berdurasi ${duration} detik. 
+Berikut adalah teks lirik lagu tersebut:
+"""
+${lyrics}
+"""
+Tugas Anda adalah memperkirakan waktu mulai (start) dan waktu selesai (end) dalam satuan detik untuk setiap baris lirik di atas agar terdistribusi dengan baik dari awal hingga akhir lagu.
+Kembalikan respon HANYA dalam format JSON Array mentah seperti contoh berikut, tanpa penjelasan teks lain, tanpa tag markdown:
+[
+  {"text": "Baris pertama lirik", "start": 0, "end": 5},
+  {"text": "Baris kedua lirik", "start": 5, "end": 10}
+]`;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const data = await response.json();
+            let rawText = data.candidates[0].content.parts[0].text;
+            
+            // Membersihkan tag markdown jika AI mengembalikannya
+            rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+            return JSON.parse(rawText);
+        }
+
+        function renderAndRecord(audio, imageFile) {
+            return new Promise((resolve, reject) => {
+                const canvas = document.getElementById('renderCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Atur dimensi berdasarkan pilihan format
+                if (selectedFormat === 'landscape') {
+                    canvas.width = 1280;
+                    canvas.height = 720;
+                } else {
+                    canvas.width = 720;
+                    canvas.height = 1280;
+                }
+
+                const img = new Image();
+                img.src = URL.createObjectURL(imageFile);
+                img.onload = () => {
+                    // Siapkan Audio Node untuk perekaman suara
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioCtx.createMediaElementSource(audio);
+                    const dest = audioCtx.createMediaStreamDestination();
+                    source.connect(dest);
+                    source.connect(audioCtx.destination); // Agar pengguna tetap bisa mendengar suara saat render
+
+                    // Gabungkan visual canvas dan audio ke dalam satu stream
+                    const canvasStream = canvas.captureStream(30); // 30 FPS
+                    const combinedStream = new MediaStream([
+                        ...canvasStream.getVideoTracks(),
+                        ...dest.stream.getAudioTracks()
+                    ]);
+
+                    // Gunakan MediaRecorder untuk merekam gabungan stream tersebut
+                    const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9' });
+                    const chunks = [];
+
+                    recorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) chunks.push(e.data);
+                    };
+
+                    recorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'video/webm' });
+                        const videoUrl = URL.createObjectURL(blob);
+                        
+                        // Tampilkan hasil akhir
+                        const videoPreview = document.getElementById('videoPreview');
+                        const downloadBtn = document.getElementById('downloadBtn');
+                        
+                        videoPreview.src = videoUrl;
+                        downloadBtn.href = videoUrl;
+                        downloadBtn.download = `AI-Music-Video-${Date.now()}.webm`;
+                        
+                        document.getElementById('outputArea').classList.remove('hidden');
+                        document.getElementById('statusText').innerText = "Video berhasil dibuat!";
+                        document.getElementById('progressBar').style.width = "100%";
+                        resolve();
+                    };
+
+                    // Jalankan audio dan perekaman
+                    audio.play();
+                    recorder.start();
+
+                    // Fungsi Loop Rendering Frame demi Frame
+                    function drawFrame() {
+                        if (audio.paused || audio.ended) {
+                            recorder.stop();
+                            audioCtx.close();
+                            return;
+                        }
+
+                        // 1. Gambar Background (Cover Fill)
+                        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                        const x = (canvas.width / 2) - (img.width / 2) * scale;
+                        const y = (canvas.height / 2) - (img.height / 2) * scale;
+                        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+                        // Overlay Gelap agar teks mudah terbaca
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // 2. Gambar Lirik Aktif berdasarkan waktu audio berjalan
+                        const currentTime = audio.currentTime;
+                        const activeLyric = lyricTimestamps.find(l => currentTime >= l.start && currentTime <= l.end);
+
+                        if (activeLyric) {
+                            ctx.font = "bold 40px sans-serif";
+                            ctx.fillStyle = "#ffffff";
+                            ctx.textAlign = "center";
+                            ctx.shadowColor = "black";
+                            ctx.shadowBlur = 10;
+                            
+                            // Letakkan teks di area tengah bawah
+                            ctx.fillText(activeLyric.text, canvas.width / 2, canvas.height * 0.8);
+                        }
+
+                        // Update progress bar UI
+                        const progressPercent = (currentTime / audio.duration) * 50 + 50;
+                        document.getElementById('progressBar').style.width = `${progressPercent}%`;
+                        document.getElementById('statusText').innerText = `Merender Frame: ${Math.floor(currentTime)}s / ${Math.floor(audio.duration)}s`;
+
+                        requestAnimationFrame(drawFrame);
+                    }
+
+                    drawFrame();
+                };
+            });
+        }
+    </script>
+</body>
+</html>
